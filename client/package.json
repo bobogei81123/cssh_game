@@ -1,0 +1,21 @@
+{
+  "name": "game-client",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@types/websocket": "^0.0.34",
+    "phaser": "^2.6.2",
+    "reconnecting-websocket": "^3.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^8.0.31",
+    "script-loader": "^0.7.2",
+    "ts-loader": "^2.3.7",
+    "typescript": "^2.5.3",
+    "webpack": "^3.6.0"
+  },
+  "scripts": {
+    "webpack": "webpack --color"
+  }
+}

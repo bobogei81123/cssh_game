@@ -1,0 +1,12 @@
+[package]
+authors = ["meteor <bobogei81123@gmail.com>"]
+name = "server"
+version = "0.1.0"
+
+[dependencies]
+futures = "0.1.16"
+futures-cpupool = "0.1.6"
+rocket = "0.3.3"
+rocket_codegen = "0.3.3"
+tokio-core = "0.1.9"
+websocket = "0.20.2"
