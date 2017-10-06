@@ -8,13 +8,23 @@ extern crate futures;
 extern crate futures_cpupool;
 extern crate tokio_core;
 
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+#[macro_use]
+extern crate serde_json;
+
 use std::path::{Path, PathBuf};
 use std::thread;
 use rocket::response::NamedFile;
 
+#[macro_use] mod macro_utils;
+
+mod game;
+
 #[get("/")]
-fn hello() -> &'static str {
-    "Hello, world"
+fn hello() -> Option<NamedFile> {
+    static_file("index.html".into())
 }
 
 #[get("/<path..>", rank = 5)]
@@ -22,10 +32,9 @@ fn static_file(path: PathBuf) -> Option<NamedFile> {
     NamedFile::open(Path::new("../client/").join(path)).ok()
 }
 
-mod websocket_logic;
 
 fn main() {
-    thread::spawn(websocket_logic::start_websocket);
+    thread::spawn(game::init);
 
     rocket::ignite().mount("/", routes![hello, static_file]).launch();
 }

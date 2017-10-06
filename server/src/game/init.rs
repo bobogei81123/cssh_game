@@ -1,47 +1,25 @@
-use std::fmt::Debug;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use tokio_core::reactor::{Core, Remote};
+use tokio_core::reactor::Core;
 use websocket::async::Server;
-use futures::{Future, Stream, Sink, future};
-use futures::sync::mpsc::{self, UnboundedSender, UnboundedReceiver};
+use futures::{Future, Stream, Sink};
+use futures::sync::mpsc;
 use futures_cpupool::CpuPool;
 
-use websocket::message::{Message, OwnedMessage};
+use websocket::message::OwnedMessage;
 use websocket::server::InvalidConnection;
 
-macro_rules! capture {
-    ($($n: ident),* => || $body:expr) => (
-        {
-            $( let $n = $n.clone(); )*
-            move || $body
-        }
-    );
-    ($($n: ident),* => |$($p:tt),*| $body:expr) => (
-        {
-            $( let $n = $n.clone(); )*
-            move |$($p),*| $body
-        }
-    );
-}
+use serde_json;
 
-macro_rules! consume_result {
-    ($fut: expr) => {
-        $fut.map_err(|_| ()).map(|_| ())
-    };
-    ($fut: expr, $map_err: expr) => {
-        $fut.map_err($map_err).map(|_| ())
-    };
-    ($fut: expr, $map_err: expr, $map: expr) => {
-        $fut.map_err($map_err).map($map)
-    }
-}
+use super::*;
+use super::runner::Runner;
+use super::event::*;
 
 struct Counter {
-    count: usize,
+    count: Id,
 }
 
 impl Counter {
@@ -51,7 +29,7 @@ impl Counter {
 }
 
 impl Iterator for Counter {
-    type Item = usize;
+    type Item = Id;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.count != Self::Item::max_value() {
@@ -63,7 +41,7 @@ impl Iterator for Counter {
     }
 }
 
-pub fn start_websocket() {
+pub fn init() {
     let mut core = Core::new().expect("Failed to create Tokio event loop");
     let handle = core.handle();
     let remote = core.remote();
@@ -78,7 +56,7 @@ pub fn start_websocket() {
 
     let connection_future = server.incoming()
         .map_err(|InvalidConnection { error, .. }| error)
-        .for_each(capture!( connections, send_sink => |(upgrade, _)| {
+        .for_each(capture!( handle, connections, send_sink => |(upgrade, _)| {
             println!("A client connected...");
             if !upgrade.protocols().contains(&"rust-websocket".to_owned()) {
                 handle.spawn(consume_result!(upgrade.reject()));
@@ -143,9 +121,12 @@ pub fn start_websocket() {
                 consume_result!(stream.for_each(move |msg| {
                     if let OwnedMessage::Text(text) = msg {
                         println!("Receive {}: {}", id, text);
-                        remote.spawn(capture!(
-                            receive_sink => |_| consume_result!(receive_sink.send((id, text)))
-                        ));
+                        let message: Option<UserMessage> = serde_json::from_str(&text).ok();
+                        if let Some(msg) = message {
+                            remote.spawn(capture!( receive_sink =>
+                               |_| consume_result!(receive_sink.send(Event::UserMessage(id, msg)))
+                            ));
+                        }
                     }
                     Ok(())
                 }))
@@ -154,27 +135,14 @@ pub fn start_websocket() {
         })
     }));
 
-    //let main_handler = pool.spawn_fn(main(receive_stream, send_sink.clone()));
-    //let main_handler = pool.spawn_fn(|| {
-        //loop {}
-        //future::result(Ok::<(), ()>(()))
-    //});
+    let mut game_runner = Runner::new(handle.clone(), send_sink);
 
-    let combined_handler = Future::join(connection_future, send_handler);
+    let main_handler = receive_stream.for_each(move |event| {
+        game_runner.proc_event(event);
+        Ok(())
+    });
+
+    let combined_handler = Future::join4(connection_future, send_handler, init_handler, main_handler);
     core.run(combined_handler).unwrap();
 }
 
-struct Runner {
-    player_n: usize,
-}
-
-impl Runner {
-    fn new() -> Self {
-        Self { player_n: 0 }
-    }
-    fn receive_msg(&mut self, (id, text): (usize, String)) {
-        if text == "Ping" {
-            self.player_n += 1;
-        }
-    }
-}
