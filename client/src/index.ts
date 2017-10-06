@@ -17,7 +17,7 @@ class SimpleGame {
     }
 
     preload() {
-        console.log("Hao123");
+        //console.log("Hao123");
     }
 
     create() {
@@ -27,7 +27,9 @@ class SimpleGame {
     connectWebsocket() {
         this.ws = new ReconnectingWebsocket(
             `ws://${window.location.hostname}:3210`, ['rust-websocket']);
-        this.ws.onmessage = console.log;
+        this.ws.onmessage = () => {
+            this.ws.send("Ping");
+        }
     }
 }
 
