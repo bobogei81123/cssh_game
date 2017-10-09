@@ -11,6 +11,12 @@ macro_rules! capture {
             move |$($p),*| $body
         }
     );
+    //($($n: ident),* => |$($p:tt : $typ: typ),*| $body:expr) => (
+        //{
+            //$( let $n = $n.clone(); )*
+            //move |$($p: $typ),*| $body
+        //}
+    //);
 }
 
 macro_rules! consume_result {

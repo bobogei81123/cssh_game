@@ -6,3 +6,4 @@ mod common;
 
 pub use self::init::init;
 pub use self::common::*;
+use super::logger;
