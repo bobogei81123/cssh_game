@@ -1,6 +1,6 @@
 const path = require('path');
 
-const phaserRoot = path.join(__dirname, 'node_modules/phaser/build/custom/');
+const phaserRoot = path.join(__dirname, 'node_modules/phaser-ce/build/custom/');
 
 
 module.exports = {

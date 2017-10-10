@@ -6,6 +6,8 @@
 #[macro_use]
 extern crate lazy_static;
 
+extern crate rand;
+
 #[macro_use]
 extern crate slog;
 extern crate slog_term;

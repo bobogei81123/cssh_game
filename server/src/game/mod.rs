@@ -1,5 +1,5 @@
 mod init;
-mod runner;
+pub mod runner;
 mod state;
 mod event;
 mod common;

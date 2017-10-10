@@ -1,3 +1,6 @@
 /target/
 **/*.rs.bk
 Cargo.lock
+*.zip
+*.psd
+.DS_Store

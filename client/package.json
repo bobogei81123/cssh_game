@@ -4,8 +4,9 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
+    "@types/es6-promise": "^0.0.33",
     "@types/websocket": "^0.0.34",
-    "phaser": "^2.6.2",
+    "phaser-ce": "^2.9.0",
     "reconnecting-websocket": "^3.2.2"
   },
   "devDependencies": {
