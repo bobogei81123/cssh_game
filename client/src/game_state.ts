@@ -1,4 +1,5 @@
-import User from './object/user'
+import User from './object/user';
+import * as _ from 'lodash';
 
 export default class GameState {
     my_id: number;
@@ -24,6 +25,34 @@ export default class GameState {
         if (id in this.users) {
             this.users[id].destroy();
             delete this.users[id];
+        }
+    }
+
+    syncUser(id, data) {
+        if (!(id in this.users)) return;
+
+        const user = this.users[id];
+        user.position.x = data.pos.x;
+        user.position.y = data.pos.y;
+        user.health = data.health.value;
+        user.maxHealth = data.health.max;
+    }
+
+    syncWith(data) {
+        const shouldRemove = _.difference(_.keys(this.users), _.keys(data.users));
+        const shouldAdd = _.difference(_.keys(data.users), _.keys(this.users));
+        const shouldSync = _.intersection(_.keys(data.users), _.keys(this.users));
+
+        for (let id of shouldRemove) {
+            this.removeUser(id);
+        }
+
+        for (let id of shouldAdd) {
+            this.addUser(data.users[id]);
+        }
+
+        for (let id of shouldSync) {
+            this.syncUser(id, data.users[id]);
         }
     }
 }

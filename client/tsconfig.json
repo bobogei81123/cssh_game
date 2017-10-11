@@ -1,13 +1,14 @@
 {
     "compilerOptions": {
         "module": "commonjs",
-        "sourceMap": true
+        "types": ["lodash", "es6-promise"]
     },
     "files": [
         "./node_modules/phaser-ce/typescript/box2d.d.ts",
         "./node_modules/phaser-ce/typescript/p2.d.ts",
         "./node_modules/phaser-ce/typescript/phaser.comments.d.ts",
-        "./node_modules/phaser-ce/typescript/pixi.comments.d.ts"
+        "./node_modules/phaser-ce/typescript/pixi.comments.d.ts",
+        "./globals.d.ts"
     ],
     "target": "es6"
 }

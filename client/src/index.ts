@@ -1,6 +1,7 @@
 require('pixi');
 require('p2');
 require('phaser');
+import * as _ from 'lodash';
 import * as Phaser from 'phaser-ce';
 import User from './object/user';
 import Bullet from './object/bullet';
@@ -48,9 +49,10 @@ class Main {
     start() {
         this.makeView();
         this.connectWebsocket();
-        this.ws.onopen = () => this.send('Join');
-        this.registEvents();
         this.game.time.advancedTiming = true;
+        this.initialize();
+
+        this.registEvents();
     }
 
     makeView() {
@@ -78,6 +80,27 @@ class Main {
                 this.receive(e.data);
             }
         }
+    }
+
+    initialize() {
+        const getInit = new Promise((resolve, reject) => {
+            this.ee.once('Initial', (data) => {
+                this.state.my_id = data.your_id;
+                resolve();
+            });
+        });
+        const getStateSync = new Promise((resolve, reject) => {
+            this.ee.once('SyncGameState', (data) => {
+                this.state.syncWith(data);
+                resolve();
+            });
+        });
+        this.ws.onopen = () => {
+            this.send('Join');
+            this.ws.onopen = null;
+        }
+        let combined = Promise.all([getInit, getStateSync]);
+        combined.then(this.startGame.bind(this));
     }
 
     send(data) {
@@ -115,12 +138,8 @@ class Main {
             this.objects.ping_info_text.text = `Ping: ${data}\nFPS: ${this.game.time.fps}`;
         });
 
-        this.ee.on('GameStateInfo', (data) => {
-            this.state.my_id = data.your_id;
-            for (let user of data.users) {
-                this.state.addUser(user);
-            }
-            this.startGame();
+        this.ee.on('SyncGameState', (data) => {
+            this.state.syncWith(data);
         });
 
         this.ee.on('Fire', (id, data) => {
