@@ -7,7 +7,8 @@
     "@types/es6-promise": "^0.0.33",
     "@types/websocket": "^0.0.34",
     "phaser-ce": "^2.9.0",
-    "reconnecting-websocket": "^3.2.2"
+    "reconnecting-websocket": "^3.2.2",
+    "wolfy87-eventemitter": "^5.2.3"
   },
   "devDependencies": {
     "@types/node": "^8.0.31",
