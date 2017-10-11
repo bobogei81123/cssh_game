@@ -6,6 +6,19 @@ pub struct Point {
     pub y: f64,
 }
 
+impl Point {
+    pub fn from_angle(angle: f64) -> Self {
+        Self {
+            x: angle.cos(),
+            y: angle.sin(),
+        }
+    }
+
+    pub fn abs(&self) -> f64 {
+        f64::hypot(self.x, self.y)
+    }
+}
+
 impl Add for Point {
     type Output = Point;
 
@@ -19,6 +32,14 @@ impl Sub for Point {
 
     fn sub(self, other: Point) -> Point {
         Point {x: self.x - other.x, y: self.y - other.y}
+    }
+}
+
+impl Mul for Point {
+    type Output = f64;
+
+    fn mul(self, other: Point) -> Self::Output {
+        self.x * other.x + self.y * other.y
     }
 }
 

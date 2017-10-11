@@ -31,10 +31,11 @@ extern crate serde_json;
 use std::path::{Path, PathBuf};
 use std::thread;
 use rocket::response::NamedFile;
-use slog::{Drain, Logger};
 
 #[macro_use] mod macro_utils;
-
+mod common;
+mod event;
+mod ws;
 mod game;
 
 #[get("/")]
@@ -47,18 +48,8 @@ fn static_file(path: PathBuf) -> Option<NamedFile> {
     NamedFile::open(Path::new("../client/").join(path)).ok()
 }
 
-lazy_static! {
-    static ref logger: Logger = {
-        let decorator = slog_term::TermDecorator::new().build();
-        let drain = slog_term::FullFormat::new(decorator).build().fuse();
-        let drain = slog_async::Async::new(drain).build().fuse();
-
-        Logger::root(drain.fuse(), o!())
-    };
-}
-
 fn main() {
 
     thread::spawn(|| rocket::ignite().mount("/", routes![hello, static_file]).launch());
-    game::init();
+    ws::start();
 }

@@ -21,10 +21,9 @@ use websocket::client::async::Client;
 
 use serde_json;
 
-use super::*;
-use super::runner::Runner;
-use super::event::*;
-
+use common::*;
+use game::{Runner, UserSend};
+use event::Event;
 
 
 struct Counter {
@@ -246,10 +245,10 @@ impl MainServer {
                             let message_fun = move |msg| {
                                 match msg {
                                     OwnedMessage::Text(text) => {
-                                        let decode: Option<UserMessage> = serde_json::from_str(&text).ok();
+                                        let decode: Option<UserSend> = serde_json::from_str(&text).ok();
                                         if let Some(user_msg) = decode {
                                             Self::spawn_remote(&remote, 
-                                                               event_sink.clone().send(Event::UserMessage(id, user_msg)));
+                                                               event_sink.clone().send(Event::UserSend(id, user_msg)));
                                         } else {
                                             warn!(logger, "Parse failed."; "id" => id, "msg" => text);
                                         }
@@ -266,7 +265,7 @@ impl MainServer {
                                             &remote,
                                             send_sink.clone().send((
                                                 id,
-                                                OwnedMessage::Text(json!({ "ping": diff }).to_string())
+                                                OwnedMessage::Text(json!({ "ping": [diff] }).to_string())
                                             ))
                                         )
                                     }
@@ -346,141 +345,8 @@ impl MainServer {
     }
 }
 
-pub fn init() {
+pub fn start() {
     let server = MainServer::new();
     server.start();
-    //let mut core = Core::new().expect("Failed to create Tokio event loop");
-    //let handle = core.handle();
-    //let remote = core.remote();
-    //let server = Server::bind("0.0.0.0:3210", &handle).expect("Failed to create server");
-
-    //let id_counter = Rc::new(RefCell::new(Counter::new()));
-    //let connections = Arc::new(RwLock::new(HashMap::new()));
-
-    //let (init_sink, init_stream) = mpsc::unbounded();
-    //let (send_sink, send_stream) = mpsc::unbounded();
-    //let (receive_sink, receive_stream) = mpsc::unbounded();
-
-    //let connection_future = server.incoming()
-        //.map_err(|InvalidConnection { error, .. }| error)
-        //.for_each(capture!( handle, connections, send_sink, receive_sink => |(upgrade, _)| {
-            //println!("A client connected...");
-            //if !upgrade.protocols().contains(&"rust-websocket".to_owned()) {
-                //handle.spawn(consume_result!(upgrade.reject()));
-                //return Ok(());
-            //}
-
-            //let fut = upgrade
-                //.use_protocol("rust-websocket")
-                //.accept()
-                //.and_then(capture!(connections, id_counter, init_sink, handle => |(s, _)| {
-                    //let id = id_counter.borrow_mut().next().unwrap();
-                    //let (sink, stream) = s.split();
-                    //handle.spawn(consume_result!(init_sink.send((id, stream))));
-                    //connections.write().unwrap().insert(id, Some(sink));
-                    //Ok(id)
-                //}))
-                //.and_then(capture!(send_sink, handle, receive_sink => |id| {
-                    //handle.spawn(
-                        //consume_result!(
-                            //receive_sink.clone().send(Event::Connect(id))
-                        //)
-                    //);
-                    //Ok(())
-                //}));
-
-            //handle.spawn(consume_result!(fut));
-
-            //Ok(())
-        //})).map_err(|_| ());
-
-    //let pool = CpuPool::new_num_cpus();
-    //let send_handler = pool.spawn_fn(capture!(remote, send_sink, receive_sink, connections => || {
-        //send_stream.for_each(move |(id, msg): (Id, OwnedMessage)| {
-            //let _out = connections.write().unwrap().remove(&id);
-            //match _out {
-                //Some(Some(out)) => {
-                    //let _msg: OwnedMessage = msg.clone();
-                    //let fut = out.send(msg)
-                        //.and_then(capture!(connections => |out| {
-                            //connections.write().unwrap().insert(id, Some(out));
-                            //Ok(())
-                        //}))
-                        //.map_err(capture!(remote, receive_sink => |_| {
-                            //remote.spawn(move |_| consume_result!(
-                                //receive_sink.clone().send(Event::Disconnect(id))
-                            //));
-                        //}));
-
-                    //remote.spawn(move |_| {
-                        //consume_result!(
-                            //fut,
-                            //move |e| println!("Send to {} error: {:?}", id, e),
-                            //move |_| println!("Send to {}: {:?}", id, _msg)
-                        //)
-                    //});
-                //}
-                //Some(None) => {
-                    //println!("Send to {} pending", id);
-                    //remote.spawn(capture!(send_sink =>
-                                          //|_| consume_result!(send_sink.send((id, msg)))));
-                //}
-                //None => {
-                    //println!("Warning: Try to send to dead {}", id);
-                //}
-            //}
-            //Ok(())
-        //})
-    //}));
-
-    //let init_handler = pool.spawn_fn(capture!( remote, receive_sink => || {
-        //init_stream.for_each(move |(id, stream)| {
-            //remote.spawn(capture!(remote, receive_sink => |_| {
-                //consume_result!(stream.for_each(move |msg| {
-                    //println!("Receive {}: {:?}", id, msg);
-                    //if let OwnedMessage::Text(text) = msg {
-                        //let message: Option<UserMessage> = serde_json::from_str(&text).ok();
-                        //if let Some(msg) = message {
-                            //remote.spawn(capture!( receive_sink =>
-                               //|_| consume_result!(receive_sink.send(Event::UserMessage(id, msg)))
-                            //));
-                        //}
-                    //}
-                    //Ok(())
-                //}))
-            //}));
-            //Ok(())
-        //})
-    //}));
-
-    //let ping_handler = pool.spawn_fn(
-        //capture!(remote, connections, send_sink => || future::loop_fn((), 
-        //capture!(=> |()| {
-        //let connections = connections.clone();
-        //{
-            //let connections = connections.write().unwrap();
-            //for (id, _) in connections.iter() {
-                //let current_time = Utc::now();
-                //let mut vec = vec![];
-                //vec.write_i64::<LittleEndian>(current_time.timestamp());
-                //vec.write_u32::<LittleEndian>(current_time.timestamp_subsec_millis());
-                //remote.spawn(capture!(id, send_sink => |_| consume_result!(send_sink.send((id, OwnedMessage::Ping(vec))))));
-            //}
-        //}
-        //thread::sleep(Duration::from_secs(1));
-        //Ok::<Loop::<(), ()>, ()>(Loop::Continue(()))
-    //}))));
-
-    //let mut game_runner = Runner::new(handle.clone(), send_sink);
-
-    //let main_handler = receive_stream.for_each(move |event| {
-        //game_runner.proc_event(event);
-        //Ok(())
-    //});
-
-    //let combined_handler = Future::join4(
-        //connection_future, send_handler, init_handler, main_handler//, ping_handler
-        //);
-    //core.run(combined_handler).unwrap();
 }
 
