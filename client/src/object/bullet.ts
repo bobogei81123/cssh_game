@@ -1,10 +1,20 @@
 import * as Phaser from 'phaser-ce';
+import {USER} from '../constant';
+
 type Point = Phaser.Point;
 const Point = Phaser.Point;
 
+export class Hit {
+    constructor(
+        public target_point: Point,
+        public onHit: () => void,
+    ) {}
+}
+
 export default class Bullet extends Phaser.Sprite {
-    constructor(game: Phaser.Game, key: string) {
-        super(game, 0, 0, key);
+
+    constructor(game: Phaser.Game, public hit?: Hit) {
+        super(game, 0, 0, 'bullet10');
         this.game.physics.arcade.enable(this);
         this.texture.baseTexture.scaleMode = PIXI.scaleModes.NEAREST;
 
@@ -22,5 +32,27 @@ export default class Bullet extends Phaser.Sprite {
         this.rotation = angle;
         this.game.physics.arcade
             .velocityFromAngle(angle * 180 / Math.PI, 300.0, this.body.velocity);
+    }
+
+    update() {
+        if (this.hit != null) {
+            console.log(this.hit.target_point, this.position);
+            let dx = this.hit.target_point.x - this.position.x;
+            let dy = this.hit.target_point.y - this.position.y;
+            let dis = Math.sqrt(dx * dx + dy * dy);
+
+            console.log(dx, dy, dis);
+
+            if (dis < USER.RADIUS * 1.1) {
+                this.hit.onHit();
+                const explosion = this.game.add.sprite(
+                    this.position.x, this.position.y, 'explosion');
+                explosion.scale.set(0.7);
+                explosion.anchor.set(0.5);
+                explosion.animations.add('boom');
+                explosion.play('boom', 20, false, true);
+                this.destroy();
+            }
+        }
     }
 }

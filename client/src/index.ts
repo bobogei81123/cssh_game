@@ -4,7 +4,7 @@ require('phaser');
 import * as _ from 'lodash';
 import * as Phaser from 'phaser-ce';
 import User from './object/user';
-import Bullet from './object/bullet';
+import Bullet, {Hit} from './object/bullet';
 import GameState from './game_state';
 import EventEmitter from 'wolfy87-eventemitter';
 
@@ -17,6 +17,8 @@ const Point = Phaser.Point;
 function preload() {
     this.load.image('background_far', 'assets/background/farback.gif');
     this.load.image('background_near', 'assets/background/starfield.png');
+
+    this.load.spritesheet('explosion', 'assets/explosion.png', 64, 64);
 
     for (let i=1; i<=4; i++) {
         this.load.spritesheet(`UFO${i}`, `assets/UFO_40x30/${i}.png`, 40, 30, 4);
@@ -142,9 +144,19 @@ class Main {
             this.state.syncWith(data);
         });
 
-        this.ee.on('Fire', (id, data) => {
-            const bullet = new Bullet(this.game, 'bullet10');
-            bullet.fire(new Point(data.pos.x, data.pos.y), data.angle);
+        this.ee.on('Fire', (data) => {
+            console.log(data);
+            const {fire, damage} = data;
+            let bullet;
+            if (damage == null) {
+                bullet = new Bullet(this.game);
+            } else {
+                bullet = new Bullet(this.game, new Hit(
+                    this.state.users[damage.target].position, () => {
+                    this.state.setHealth(damage.target, damage.health_after);
+                }));
+            }
+            bullet.fire(new Point(fire.pos.x, fire.pos.y), fire.angle);
         });
     }
 
@@ -172,12 +184,4 @@ class Main {
 
 window.onload = () => {
     const main = new Main();
-}
-
-function applyMixins(derivedCtor: any, baseCtors: any[]) {
-    baseCtors.forEach(baseCtor => {
-        Object.getOwnPropertyNames(baseCtor.prototype).forEach(name => {
-            derivedCtor.prototype[name] = baseCtor.prototype[name];
-        });
-    });
 }

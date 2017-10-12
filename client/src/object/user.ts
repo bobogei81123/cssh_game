@@ -1,4 +1,5 @@
 import * as Phaser from 'phaser-ce';
+import {USER} from '../constant';
 type Point = Phaser.Point;
 const Point = Phaser.Point;
 
@@ -12,19 +13,11 @@ export default class User extends Phaser.Sprite {
     //maxHealth: number;
     //health: number;
 
-    static HEALTHBAR_WIDTH = 30;
-    static HEALTHBAR_HEIGHT = 2;
-
-    static HZ = 0.6;
-    static UPDATE_TICK = 0.016;
-
-    static RADIUS = 18;
-    static BASE_RADIUS = 15;
 
     constructor(game: Phaser.Game, key: string, pos: Point, health=100, maxHealth=100) {
         super(game, pos.x, pos.y, key);
         this.texture.baseTexture.scaleMode = PIXI.scaleModes.NEAREST;
-        this.scale.set(User.RADIUS / User.BASE_RADIUS);
+        this.scale.set(USER.RADIUS / USER.BASE_RADIUS);
 
         this.animations.add('stand');
         this.animations.play('stand', 10, true);
@@ -60,18 +53,18 @@ export default class User extends Phaser.Sprite {
         this.healthBar.clear();
         this.healthBar.beginFill(0xff0000);
         this.healthBar.drawRect(
-            -User.HEALTHBAR_WIDTH/2,
-            -User.HEALTHBAR_HEIGHT/2,
-            User.HEALTHBAR_WIDTH,
-            User.HEALTHBAR_HEIGHT
+            -USER.HEALTHBAR_WIDTH/2,
+            -USER.HEALTHBAR_HEIGHT/2,
+            USER.HEALTHBAR_WIDTH,
+            USER.HEALTHBAR_HEIGHT
         );
         this.healthBar.beginFill(0x00ff00);
-        let nw = User.HEALTHBAR_WIDTH * (this.maxHealth - this.health) / this.maxHealth;
+        let nw = USER.HEALTHBAR_WIDTH * (this.maxHealth - this.health) / this.maxHealth;
         this.healthBar.drawRect(
-            -User.HEALTHBAR_WIDTH/2 + nw,
-            -User.HEALTHBAR_HEIGHT/2,
-            User.HEALTHBAR_WIDTH - nw,
-            User.HEALTHBAR_HEIGHT
+            -USER.HEALTHBAR_WIDTH/2 + nw,
+            -USER.HEALTHBAR_HEIGHT/2,
+            USER.HEALTHBAR_WIDTH - nw,
+            USER.HEALTHBAR_HEIGHT
         );
     }
 
@@ -80,8 +73,8 @@ export default class User extends Phaser.Sprite {
         this.arrow.rotation = Math.random() * Math.PI * 2;
         this.timer = new Phaser.Timer(this.game);
         this._lastTick = (new Date()).valueOf();
-        this.loopEvent = this.timer.loop(User.UPDATE_TICK * 1000, () => {
-            this.arrow.rotation += User.HZ * 2 * Math.PI * User.UPDATE_TICK;
+        this.loopEvent = this.timer.loop(USER.UPDATE_TICK * 1000, () => {
+            this.arrow.rotation += USER.HZ * 2 * Math.PI * USER.UPDATE_TICK;
             this._lastTick = (new Date()).valueOf();
         });
         this.game.time.add(this.timer);
@@ -92,7 +85,7 @@ export default class User extends Phaser.Sprite {
         const current = (new Date()).valueOf();
         const diff = current - this._lastTick;
 
-        this.arrow.rotation += User.HZ * 2 * Math.PI * diff / 1000;
+        this.arrow.rotation += USER.HZ * 2 * Math.PI * diff / 1000;
         this.arrow.visible = false;
         this.timer.destroy();
         return [{x: this.position.x, y: this.position.y}, this.arrow.rotation];

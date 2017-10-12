@@ -55,4 +55,8 @@ export default class GameState {
             this.syncUser(id, data.users[id]);
         }
     }
+
+    setHealth(id, val) {
+        this.users[id].health = val;
+    }
 }
