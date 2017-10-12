@@ -7,6 +7,7 @@
     "@types/es6-promise": "^0.0.33",
     "@types/lodash": "^4.14.77",
     "@types/websocket": "^0.0.34",
+    "bulma": "^0.6.0",
     "lodash": "^4.17.4",
     "phaser-ce": "^2.9.0",
     "reconnecting-websocket": "^3.2.2",

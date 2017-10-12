@@ -1,6 +1,7 @@
 use common::*;
 use super::data_struct::*;
 use super::state::GameState;
+use super::problem::ProblemOut;
 
 #[derive(Serialize)] 
 pub enum Output<'a> {
@@ -8,5 +9,6 @@ pub enum Output<'a> {
     SyncGameState(&'a GameState),
     UserAdd(User),
     UserRemote(Id),
-    Fire(Id, Fire),
+    Fire(FireOut),
+    Problem(ProblemOut),
 }

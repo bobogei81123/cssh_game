@@ -28,6 +28,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 
+extern crate toml;
+
 use std::path::{Path, PathBuf};
 use std::thread;
 use rocket::response::NamedFile;

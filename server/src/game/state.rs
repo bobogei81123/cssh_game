@@ -7,6 +7,15 @@ pub struct GameState {
     pub users: HashMap<Id, User>,
 }
 
+#[derive(Debug, Clone)]
+pub enum UserState {
+    Waiting,
+    Answering,
+    Firing,
+    Penalizing,
+}
+
+
 impl GameState {
     pub fn new() -> Self {
         Self { 
@@ -20,5 +29,11 @@ impl GameState {
 
     pub fn remove_user(&mut self, id: Id) {
         self.users.remove(&id);
+    }
+
+    pub fn damage(&mut self, id: Id, val: f64) -> f64 {
+        let who = self.users.get_mut(&id).unwrap();
+        who.health.sub(val);
+        who.health.value
     }
 }

@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "module": "commonjs",
-        "types": ["lodash", "es6-promise"]
+        "types": ["lodash", "es6-promise"],
     },
     "files": [
         "./node_modules/phaser-ce/typescript/box2d.d.ts",

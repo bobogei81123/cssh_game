@@ -5,5 +5,6 @@ pub enum UserSend {
     Join,
     Fire(Fire),
     RequestSyncGameState,
+    RequestProblem,
 }
 

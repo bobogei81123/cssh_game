@@ -13,16 +13,17 @@ mod user_send;
 mod state;
 mod output;
 mod constant;
+mod problem;
 
 use common::*;
 use event::Event;
 use self::point::Point;
 use self::data_struct::*;
 pub use self::user_send::UserSend;
-use self::state::GameState;
+use self::state::*;
 use self::output::Output;
 use self::constant::*;
-
+use self::problem::{Problem, parse_file, ProblemOut};
 
 pub struct Runner {
     state: GameState,
@@ -30,6 +31,7 @@ pub struct Runner {
     output_sink: UnboundedSender<(Id, OwnedMessage)>,
     event_sink: UnboundedSender<Event>,
     rng: rand::ThreadRng,
+    problems: Vec<Problem>,
 }
 
 impl Runner {
@@ -44,7 +46,12 @@ impl Runner {
             output_sink: output_sink,
             event_sink: event_sink,
             rng: rand::thread_rng(),
+            problems: vec![],
         }
+    }
+
+    pub fn init(&mut self) {
+        self.problems = parse_file("problems/problem.toml");
     }
 
     pub fn proc_event(&mut self, event: Event) {
@@ -64,7 +71,7 @@ impl Runner {
         info!(logger, "User {} disconnected", id);
         self.state.remove_user(id);
         for id in self.state.users.keys() {
-            self.send(*id, Output::SyncGameState(&self.state));
+            self.send(*id, &Output::SyncGameState(&self.state));
         }
     }
 
@@ -77,9 +84,41 @@ impl Runner {
                 self.user_fire(id, data); 
             }
             UserSend::RequestSyncGameState => {
-                self.send(id, Output::SyncGameState(&self.state));
+                self.send(id, &Output::SyncGameState(&self.state));
+            }
+            UserSend::RequestProblem => {
+                self.assign_problem(id);
             }
         }
+    }
+
+    fn assign_problem(&mut self, id: Id) {
+        let prob = {
+            let user = self.state.users.get_mut(&id).unwrap();
+
+            let id = match user.assigned_problem {
+                Some(id) => id,
+                None => {
+                    let n = self.problems.len();
+                    self.rng.gen_range(0, n)
+                }
+            };
+
+            user.assigned_problem = Some(id);
+
+            &self.problems[id]
+        };
+
+        let output = Output::Problem(ProblemOut {
+            question: prob.question.clone(),
+            answers: {
+                let mut vec = prob.answers.clone();
+                self.rng.shuffle(&mut vec);
+                vec
+            }
+        });
+
+        self.send(id, &output);
     }
 
     fn new_user(&mut self, id: Id) {
@@ -97,15 +136,17 @@ impl Runner {
             health: Health {
                 max: 100.,
                 value: 100.,
-            }
+            },
+            assigned_problem: None,
+            state: UserState::Waiting,
         };
 
         self.state.add_user(new_user);
 
-        self.send(id, Output::Initial(Initial { your_id: id }));
+        self.send(id, &Output::Initial(Initial { your_id: id }));
 
         for id in self.state.users.keys() {
-            self.send(*id, Output::SyncGameState(&self.state));
+            self.send(*id, &Output::SyncGameState(&self.state));
         }
     }
 
@@ -118,45 +159,66 @@ impl Runner {
         (dp, dd)
     }
 
-    fn user_fire(&self, id: Id, data: Fire) {
+    fn user_fire(&mut self, id: Id, data: Fire) {
 
         let my_pos = self.state.users.get(&id).unwrap().pos;
 
         let result = self.state.users.values().fold(
             None,
             |x, ref user| {
-                if user.id == id { return x; }
-                let (dp, dd) = Self::_get_distant_to_line(
+                let target = user.id;
+                if target == id { return x; }
+                let (dis_par, dis_oth) = Self::_get_distant_to_line(
                     my_pos, data.angle, user.pos);
 
-                println!("dd = {}", dd);
-
-                if dp < 0. || dd > USER_RADIUS { return x; }
+                if dis_par < 0. || dis_oth > USER_RADIUS { return x; }
 
                 match x {
-                    None => Some((id, dp)),
-                    Some(z) => {
-                        let (_, y) = z;
-                        if y < dp { Some((id, dp)) }
-                        else { Some(z) }
+                    None => Some((target, dis_par, dis_oth)),
+                    Some(best) => {
+                        let (_, best_par, _) = best;
+                        if best_par > dis_par { Some((target, dis_par, dis_oth)) }
+                        else { Some(best) }
                     }
                 }
             }
         );
 
-        match result { 
-            None => {
-                for user in self.state.users.keys() {
-                    self.send(*user, Output::Fire(id, data.clone()));
-                }
+        //let damage_val = result.map(|(_, _, d)
+            //40 * (USER_RADIUS - d) / USER_RADIUS + 10; 
+        //)
+
+        let damage_val = result.map(|(target, dis_par, dis_oth)| (
+            target,
+            40. * (USER_RADIUS - dis_oth) / USER_RADIUS + 10., 
+        ));
+
+
+        let damage = match damage_val {
+            Some((target, val)) => {
+                let health_after = self.state.damage(target, val);
+                Some(Damage {
+                    target: target,
+                    value: val,
+                    health_after: health_after,
+                })
             }
-            Some((id, dp)) => {
-                info!(logger, "Hit"; "id" => id, "dp" => dp);
-            }
+            None => None,
+        };
+
+
+        let output = Output::Fire(FireOut {
+            id: id,
+            fire: data,
+            damage: damage,
+        });
+
+        for id in self.state.users.keys() {
+            self.send(*id, &output);
         }
     }
 
-    fn send(&self, id: Id, msg: Output) {
+    fn send(&self, id: Id, msg: &Output) {
         self._send(id, serde_json::to_string(&msg).unwrap());
     }
 

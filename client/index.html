@@ -3,16 +3,41 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <link rel="stylesheet" href="style.css" type="text/css"/>
+    <link rel="stylesheet" href="node_modules/bulma/css/bulma.css" type="text/css"/>
 
     <title></title>
   </head>
 
   <body>
-    <!--<div id="wrapper">-->
-      <div id="content">
+    <div id="content"></div>
+    <div class="modal" id="modal">
+      <div class="modal-background"> </div>
+      <div class="modal-card"> 
+        <!--<header class="modal-card-head">-->
+          <!--<p class="modal-card-title">題目</p>-->
+        <!--</header>-->
+        <section class="modal-card-body">
+          <article class="message">
+            <div class="message-header">
+              <p>題目</p>
+            </div>
+            <div class="message-body" id="question">
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. <strong>Pellentesque risus mi</strong>, tempus quis placerat ut, porta nec nulla. Vestibulum rhoncus ac ex sit amet fringilla. Nullam gravida purus diam, et dictum <a>felis venenatis</a> efficitur. Aenean ac <em>eleifend lacus</em>, in mollis lectus. Donec sodales, arcu et sollicitudin porttitor, tortor urna tempor ligula, id porttitor mi magna a neque. Donec dui urna, vehicula et sem eget, facilisis sodales sem.
+            </div>
+          </article>
+          <div class="columns is-desktop">
 
+            <div class="column" id="answers">
+              <!--<article class="message is-primary">-->
+                <!--<div class="message-body">-->
+                  <!--123123123-->
+                <!--</div>-->
+              <!--</article>-->
+            </div>
+          </div>
+        </section>
       </div>
-    <!--</div>-->
+    </div>
     <script src="bundle.js"></script>
   </body>
 

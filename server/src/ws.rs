@@ -328,11 +328,13 @@ impl MainServer {
         let remote = self.core.remote();
         let pool = CpuPool::new_num_cpus();
 
-        let runner = Runner::new(
+        let mut runner = Runner::new(
             handle.clone(), 
             self.send_channel.sink.clone(),
             self.event_channel.sink.clone(),
         );
+
+        runner.init();
 
         let combined_handler = Future::join5(
             self.make_connection_future(&handle),

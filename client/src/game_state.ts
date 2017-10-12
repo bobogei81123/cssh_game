@@ -1,7 +1,7 @@
-import User from './object/user';
+import User from './objects/user';
 import * as _ from 'lodash';
 
-export default class GameState {
+export default class GameData {
     my_id: number;
     users: { [index: number]: User; };
 
