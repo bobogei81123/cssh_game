@@ -1,6 +1,39 @@
 use common::*;
 use super::point::Point;
-use super::state::UserState;
+use super::state::*;
+
+#[derive(Debug, Serialize, Clone)]
+pub struct User {
+    pub id: Id,
+    pub name: String,
+    pub team: usize,
+    pub ready: bool,
+}
+
+impl User {
+    pub fn new(id: Id) -> Self {
+        Self {
+            id: id,
+            name: "".into(),
+            team: 0,
+            ready: false,
+        }
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub struct Player {
+    pub id: Id,
+    pub name: String,
+    pub team: usize,
+    pub pos: Point,
+    pub health: Health,
+
+    #[serde(skip_serializing)]
+    pub assigned_problem: Option<usize>,
+    #[serde(skip_serializing)]
+    pub state: UserState,
+}
 
 #[derive(Debug, Serialize, Clone)]
 pub struct Health {
@@ -18,17 +51,6 @@ impl Health {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct User {
-    pub id: Id,
-    pub pos: Point,
-    pub health: Health,
-
-    #[serde(skip_serializing)]
-    pub assigned_problem: Option<usize>,
-    #[serde(skip_serializing)]
-    pub state: UserState,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Fire {
@@ -38,7 +60,7 @@ pub struct Fire {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct Initial {
-    pub your_id: Id,
+    pub id: Id,
 }
 
 #[derive(Serialize, Clone, Debug)]

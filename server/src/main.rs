@@ -1,12 +1,14 @@
-#![feature(plugin)]
+#![feature(plugin, custom_attribute)]
 #![plugin(rocket_codegen)]
-#![feature(conservative_impl_trait, type_ascription)]
+#![feature(conservative_impl_trait, type_ascription, fnbox, vec_remove_item)]
 #![allow(non_upper_case_globals)]
 
 #[macro_use]
 extern crate lazy_static;
 
 extern crate rand;
+
+extern crate itertools;
 
 #[macro_use]
 extern crate slog;

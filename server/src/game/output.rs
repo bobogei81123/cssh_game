@@ -1,14 +1,15 @@
 use common::*;
 use super::data_struct::*;
-use super::state::GameState;
+use super::state::*;
 use super::problem::ProblemOut;
 
 #[derive(Serialize)] 
 pub enum Output<'a> {
     Initial(Initial),
-    SyncGameState(&'a GameState),
-    UserAdd(User),
-    UserRemote(Id),
+    RoomData(RoomData<'a>),
+    GameStart,
+    PlayersData(PlayersData<'a>),
     Fire(FireOut),
     Problem(ProblemOut),
+    JudgeResult(bool),
 }
