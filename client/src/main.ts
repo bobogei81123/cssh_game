@@ -2,9 +2,10 @@ import * as _ from 'lodash';
 import * as Phaser from 'phaser-ce';
 import User from './objects/user';
 import Bullet, {Hit} from './objects/bullet';
-import GameData from './game_state';
+import GameData from './game_data';
 import EventEmitter from 'wolfy87-eventemitter';
 import * as State from './states';
+import {GAME} from './constant';
 
 import * as ReconnectingWebsocket from 'reconnecting-websocket';
 
@@ -18,32 +19,33 @@ export default class Main extends Phaser.Game {
     ee: EventEmitter;
 
     constructor() {
-        super(800, 600, Phaser.AUTO, 'content');
-        //super(800, 600, Phaser.AUTO, 'content', {
-            //init() {
-                //this.physics.startSystem(Phaser.Physics.ARCADE);
-            //},
-            //preload: preload,
-            //create: this.start.bind(this),
-        //});
+        super(GAME.WIDTH, GAME.HEIGHT, Phaser.AUTO, 'content');
 
         this.data = new GameData(this);
         this.ee = new EventEmitter<string>();
         this.objects = {};
         this.state.add('boot', new State.Boot(this));
+        this.state.add('room', new State.Room(this));
         this.state.add('start', new State.Start(this));
         this.state.start('boot');
     }
 
-    connectWebsocket() {
-        this.ws = new ReconnectingWebsocket(
-            `ws://${window.location.hostname}:3210`, ['rust-websocket']);
+    connectWebsocket(): Promise<any> {
+        return new Promise((resolve, reject) => {
+            this.ws = new ReconnectingWebsocket(
+                `ws://${window.location.hostname}:3210`, ['rust-websocket']);
 
-        this.ws.onmessage = (e) => {
-            if ('data' in e) {
-                this.receive(e.data);
-            }
-        }
+            this.ws.onopen = () => {
+                this.ws.onopen = null;
+                resolve();
+            };
+
+            this.ws.onmessage = (e) => {
+                if ('data' in e) {
+                    this.receive(e.data);
+                }
+            };
+        });
     }
 
 
@@ -63,6 +65,11 @@ export default class Main extends Phaser.Game {
     }
 
     _receive(parsed) {
+        console.log(parsed);
+        if (typeof parsed == 'string') {
+            this.ee.emitEvent(parsed);
+            return;
+        }
         const ks = Object.keys(parsed);
         if (!ks.length) return;
 
@@ -77,32 +84,12 @@ export default class Main extends Phaser.Game {
         }
     }
 
-    registEvents() {
-
-        this.ee.on('SyncGameData', (data) => {
-            this.state.syncWith(data);
-        });
-
-    }
-
-    startFire() {
+    waitForEvent(name): Promise<any> {
         return new Promise((resolve, reject) => {
-            this.input.onDown.addOnce(() => {
-                const promise = new Promise((resolve, reject) => {
-                    const me = this.data.me();
-                    me.startSpin();
-                    this.input.onDown.addOnce(() => resolve(me));
-                }).then((me: User) => {
-                    const [pos, angle] = me.stopSpin();
-                    this.send({
-                        Fire: {
-                            pos: pos,
-                            angle: angle,
-                        }
-                    });
-                    resolve();
-                });
-            }, this);
+            this.ee.once(name, (data) => {
+                resolve(data)
+            });
         });
     }
+
 }

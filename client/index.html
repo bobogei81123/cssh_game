@@ -10,8 +10,9 @@
 
   <body>
     <div id="content"></div>
-    <div class="modal" id="modal">
-      <div class="modal-background"> </div>
+    
+    <div class="modal" id="problem-modal" style="opacity: 0.75 !important;">
+      <div class="modal-background" style="rgba(10, 10, 10, 0.6) !important;"> </div>
       <div class="modal-card"> 
         <!--<header class="modal-card-head">-->
           <!--<p class="modal-card-title">題目</p>-->
@@ -21,8 +22,7 @@
             <div class="message-header">
               <p>題目</p>
             </div>
-            <div class="message-body" id="question">
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. <strong>Pellentesque risus mi</strong>, tempus quis placerat ut, porta nec nulla. Vestibulum rhoncus ac ex sit amet fringilla. Nullam gravida purus diam, et dictum <a>felis venenatis</a> efficitur. Aenean ac <em>eleifend lacus</em>, in mollis lectus. Donec sodales, arcu et sollicitudin porttitor, tortor urna tempor ligula, id porttitor mi magna a neque. Donec dui urna, vehicula et sem eget, facilisis sodales sem.
+            <div class="message-body" id="question" style="color: black;">
             </div>
           </article>
           <div class="columns is-desktop">
@@ -36,6 +36,25 @@
             </div>
           </div>
         </section>
+      </div>
+    </div>
+
+    <div class="modal" id="enter-name-modal">
+      <div class="modal-background"> </div>
+      <div class="modal-content"> 
+        <div class="box">
+          <div class="field">
+            <label class="label">Enter your name: </label>
+          </div>
+          <div class="field is-grouped">
+            <div class="control is-expanded">
+              <input class="input" type="text" id="name-input"/>
+            </div>
+            <div class="control">
+              <button class="button is-link" id="submit-button">Submit</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <script src="bundle.js"></script>

@@ -31,7 +31,7 @@ export default class Bullet extends Phaser.Sprite {
         this.scale.set(1);
         this.rotation = angle;
         this.game.physics.arcade
-            .velocityFromAngle(angle * 180 / Math.PI, 300.0, this.body.velocity);
+            .velocityFromAngle(angle * 180 / Math.PI, 400.0, this.body.velocity);
     }
 
     update() {

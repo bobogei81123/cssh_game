@@ -16,11 +16,16 @@ export class Boot extends Phaser.State {
             this.load.spritesheet(`UFO${i}`, `assets/UFO_40x30/${i}.png`, 40, 30, 4);
         }
 
-        this.load.image('bullet10', 'assets/bullet10.png')
+        this.load.image('bullet10', 'assets/bullet10.png');
+        this.load.image('check', 'assets/check.png');
+        this.load.image('cross', 'assets/cross.png');
+        this.load.image('button', 'assets/button.png');
+        this.load.image('button-dark', 'assets/button-dark.png');
     }
 
     create() {
         this.makeView();
+        this.game.stage.disableVisibilityChange = true;
         this.game.time.advancedTiming = true;
         this.initialize();
     }
@@ -41,30 +46,53 @@ export class Boot extends Phaser.State {
             this.game.add.text(760, 10, 'Ping: ', {fill: '#FFFFFF', fontSize: 10});
     }
 
-    initialize() {
-        const getInit = new Promise((resolve, reject) => {
-            this.main.ee.once('Initial', (data) => {
-                this.main.data.my_id = data.your_id;
-                resolve();
-            });
+    async enterName(): Promise<any> {
+        const $enterNameModal = document.getElementById('enter-name-modal');
+        const $submitButton = document.getElementById('submit-button');
+        $enterNameModal.classList.add('is-active');
+        return new Promise((resolve, reject) => {
+            $submitButton.onclick = () => {
+                const $nameInput = <HTMLInputElement>document.getElementById('name-input');
+                $submitButton.onclick = null;
+                $enterNameModal.classList.remove('is-active');
+                resolve($nameInput.value);
+            };
         });
-        const getStateSync = new Promise((resolve, reject) => {
-            this.main.ee.once('SyncGameState', (data) => {
-                this.main.data.syncWith(data);
-                resolve();
-            });
-        });
+    }
 
-        this.main.connectWebsocket();
-        this.main.ws.onopen = () => {
-            this.main.send('Join');
-            this.main.ws.onopen = null;
-        }
-        let combined = Promise.all([getInit, getStateSync]);
-        combined.then(() => this.game.state.start('start', false));
+    async initialize() {
+        await this.main.connectWebsocket();
 
         this.main.ee.on('ping', (data) => {
             this.main.objects.ping_info_text.text = `Ping: ${data}\nFPS: ${this.game.time.fps}`;
         });
+        this.main.send('RequestInitial');
+
+        const initial = await this.main.waitForEvent('Initial');
+        this.main.data.id = initial.id;
+
+        const name = await this.enterName();
+        this.game.state.start('room', false, false, name);
+        //const getInit = new Promise((resolve, reject) => {
+            //this.main.ee.once('Initial', (data) => {
+                //this.main.data.my_id = data.your_id;
+                //resolve();
+            //});
+        //});
+        //const getStateSync = new Promise((resolve, reject) => {
+            //this.main.ee.once('SyncGameState', (data) => {
+                //this.main.data.syncWith(data);
+                //resolve();
+            //});
+        //});
+
+        //this.main.connectWebsocket();
+        //this.main.ws.onopen = () => {
+            //this.main.send('Join');
+            //this.main.ws.onopen = null;
+        //}
+        //let combined = Promise.all([getInit, getStateSync]);
+        //combined.then(() => this.game.state.start('start', false));
+
     }
 }
