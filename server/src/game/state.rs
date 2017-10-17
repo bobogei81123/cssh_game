@@ -7,6 +7,7 @@ pub struct GameData {
     pub users: HashMap<Id, User>,
     pub teams: [Vec<Id>; 2],
     pub players: HashMap<Id, Player>,
+    pub spectators: Vec<Id>,
     //pub users_game_data:
 }
 
@@ -43,6 +44,7 @@ impl GameData {
             users: HashMap::new(),
             teams: [vec![], vec![]],
             players: HashMap::new(),
+            spectators: vec![],
         }
     }
 

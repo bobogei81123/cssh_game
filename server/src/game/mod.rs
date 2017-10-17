@@ -136,6 +136,14 @@ impl Runner {
     fn user_join_room(&mut self, id: Id, name: String) {
         require_game_state!(self, GameState::Preparing);
 
+        if name == "spectator" {
+            let user = ensure!(self.data.users.get_mut(&id));
+            self.data.spectators.push(id);
+            user.team = 2;
+            user.name = name;
+            return;
+        }
+
         {
             let user = ensure!(self.data.users.get_mut(&id));
             let teams = &mut self.data.teams;
@@ -179,19 +187,19 @@ impl Runner {
 
         self.data.players = {
             let mut generate_point = || Point {
-                x: ((self.rng.next_u32() as f64) % 
-                    (GAME_WIDTH - GAME_WIDTH_MARGIN) + GAME_WIDTH_MARGIN/2.) as f64,
-                y: ((self.rng.next_u32() as f64) %
-                    (GAME_HEIGHT - GAME_HEIGHT_MARGIN) + GAME_HEIGHT_MARGIN/2.) as f64,
+                x: ((self.rng.next_u32() as f64) % (GAME_WIDTH - GAME_WIDTH_MARGIN)
+                    + GAME_WIDTH_MARGIN/2.) as f64,
+                y: ((self.rng.next_u32() as f64) % (GAME_HEIGHT - GAME_HEIGHT_MARGIN)
+                    + GAME_HEIGHT_MARGIN/2.) as f64,
             };
 
-            users.into_iter().map({
+            users.into_iter().filter(|u| u.1.team != 2).map({
                 let mut pts = vec![];
 
                 move |(id, user)| {
                     let pos = loop {
                         let pos = generate_point();
-                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 50.0) { 
+                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 80.0) { 
                             pts.push(pos);
                             break pos; 
                         }
@@ -215,7 +223,7 @@ impl Runner {
         };
 
         self.data.game_state = GameState::Started;
-        self.send_all(self.data.players.keys(), &Output::GameStart);
+        self.send_all(self.data.players.keys().chain(self.data.spectators.iter()), &Output::GameStart);
     }
 
     fn assign_problem(&mut self, id: Id) {
@@ -290,7 +298,7 @@ impl Runner {
         require_game_state!(self, GameState::Started);
 
         info!(logger, "Team #{} won!", team);
-        self.send_all(self.data.players.keys(), &Output::TeamWin(team));
+        self.send_all(self.data.players.keys().chain(self.data.spectators.iter()), &Output::TeamWin(team));
         self.finalize();
     }
 
@@ -381,9 +389,8 @@ impl Runner {
 
 
 
-        for id in self.data.players.keys() {
-            self.send(*id, &output);
-        }
+        self.send_all(self.data.players.keys().chain(self.data.spectators.iter()),
+            &output);
     }
 
     fn send(&self, id: Id, msg: &Output) {

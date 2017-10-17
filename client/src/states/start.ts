@@ -150,12 +150,17 @@ export class Start extends Phaser.State {
     startFire() {
         console.log('start fire');
         return new Promise((resolve, reject) => {
+            const hint = this.game.add.text(400, 20, '點擊任意一處開始描準', {fill: 'white', fontSize: 20});
+            hint.anchor.set(0.5);
+
             this.input.onDown.addOnce(() => {
+                hint.text = '再次點擊往箭頭方向射擊';
                 const promise = new Promise((resolve, reject) => {
                     const me = this.main.data.me();
                     me.startSpin();
                     this.input.onDown.addOnce(() => resolve(me));
                 }).then((me: User) => {
+                    hint.destroy();
                     const [pos, angle] = me.stopSpin();
                     this.main.send({
                         Fire: {
