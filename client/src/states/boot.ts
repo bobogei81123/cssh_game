@@ -21,6 +21,10 @@ export class Boot extends Phaser.State {
         this.load.image('cross', 'assets/cross.png');
         this.load.image('button', 'assets/button.png');
         this.load.image('button-dark', 'assets/button-dark.png');
+
+        this.load.image('win', 'assets/misc/win.png');
+        this.load.image('lose', 'assets/misc/lose.png');
+        this.load.image('dead', 'assets/misc/dead.png');
     }
 
     create() {

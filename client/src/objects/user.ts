@@ -10,12 +10,13 @@ export default class User extends Phaser.Sprite {
     timer?: Phaser.Timer;
     loopEvent?: Phaser.TimerEvent;
     _lastTick?: number;
-    //maxHealth: number;
-    //health: number;
+    name: string;
+    team: number;
+    friend: boolean;
 
-
-    constructor(game: Phaser.Game, key: string, pos: Point, health=100, maxHealth=100) {
-        super(game, pos.x, pos.y, key);
+    constructor(game: Phaser.Game, data: any, friend: boolean) {
+        const {name, team, pos, health} = data;
+        super(game, pos.x, pos.y, friend ? 'UFO3' : 'UFO1');
         this.texture.baseTexture.scaleMode = PIXI.scaleModes.NEAREST;
         this.scale.set(USER.RADIUS / USER.BASE_RADIUS);
 
@@ -23,8 +24,11 @@ export default class User extends Phaser.Sprite {
         this.animations.play('stand', 10, true);
         this.anchor.set(0.5);
 
-        this.health = health;
-        this.maxHealth = maxHealth;
+        this.name = name;
+        this.team = team;
+        this.health = health.value;
+        this.maxHealth = health.max;
+        this.friend = friend;
 
         const healthBar = new Phaser.Graphics(game, 0, -20);
         this.healthBar = healthBar;
@@ -40,6 +44,11 @@ export default class User extends Phaser.Sprite {
         arrow.visible = false;
         this.arrow = arrow;
         this.addChild(arrow);
+
+        console.log(this.name);
+        const name_text = new Phaser.Text(this.game, 0, 22, this.name, {fontSize: 10, fill: 'white'});
+        name_text.anchor.set(0.5);
+        this.addChild(name_text);
 
         //const circle = new Phaser.Graphics(this.game, 0, 0);
         //circle.beginFill(0xff0000);
@@ -89,5 +98,12 @@ export default class User extends Phaser.Sprite {
         this.arrow.visible = false;
         this.timer.destroy();
         return [{x: this.position.x, y: this.position.y}, this.arrow.rotation];
+    }
+
+    markDead() {
+        const dead = new Phaser.Sprite(this.game, 0, 0, 'dead');
+        dead.anchor.set(0.5);
+        dead.scale.set(0.3);
+        this.addChild(dead);
     }
 }

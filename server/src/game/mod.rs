@@ -77,13 +77,20 @@ impl Runner {
     fn user_disconnect(&mut self, id: Id) {
         info!(logger, "User {} disconnected", id);
 
-        if self.data.game_state == GameState::Preparing {
-            match self.data.users.remove(&id) {
-                Some(user) => {
-                    let team = &mut self.data.teams[user.team];
-                    team.remove_item(&id);
+        match self.data.game_state {
+            GameState::Preparing => {
+                match self.data.users.remove(&id) {
+                    Some(user) => {
+                        let team = &mut self.data.teams[user.team];
+                        team.remove_item(&id);
+                    }
+                    None => (),
                 }
-                None => (),
+            }
+            GameState::Started => {
+                if self.data.players.contains_key(&id) {
+                    self.user_dead(id);
+                }
             }
         }
         //self.state.remove_user(id);
@@ -200,6 +207,7 @@ impl Runner {
                     },
                     assigned_problem: None,
                     state: UserState::Waiting,
+                    alive: true,
                 })
             }
         }).collect();
@@ -262,19 +270,48 @@ impl Runner {
         //}
     }
 
-    //fn exec_timeout<F>(&self, f: Box<F>, duration: Duration)
-        //where for<'r> F: FnBox(&'r mut Runner) -> () + Send + 'static {
-        //let future = Timeout::new(duration, &self.handle).unwrap()
-            //.and_then({
-                //let event_sink = self.event_sink.clone();
-                //let handle = self.handle.clone();
-                //move |_| {
-                    //handle.spawn(consume_result!(event_sink.send(Event::Timeout(f))));
-                    //Ok(())
-                //}
-            //}).map_err(|_| ());
-        //self.handle.spawn(future);
-    //}
+    fn user_dead(&mut self, id: Id) {
+        self.data.players.get_mut(&id).unwrap().alive = false;
+        for jd in self.data.players.keys() {
+            self.send(*jd, &Output::Dead(id));
+        }
+        self.check_win();
+    }
+
+    fn check_win(&mut self) {
+        for i in (0..2) {
+            if self.data.teams[i].iter().all(|p| !self.data.players.get(&p).unwrap().alive) {
+                self.team_win(1 - i);
+                return;
+            }
+        }
+    }
+
+    fn team_win(&mut self, team: usize) {
+        for player in self.data.players.keys() {
+            self.send(*player, &Output::TeamWin(team));
+        }
+
+        self.finalize();
+    }
+
+    fn finalize(&mut self) {
+        self.data.players.clear();
+    }
+
+    fn exec_timeout<F>(&self, f: Box<F>, duration: Duration)
+        where for<'r> F: FnBox(&'r mut Runner) -> () + Send + 'static {
+        let future = Timeout::new(duration, &self.handle).unwrap()
+            .and_then({
+                let event_sink = self.event_sink.clone();
+                let handle = self.handle.clone();
+                move |_| {
+                    handle.spawn(consume_result!(event_sink.send(Event::Timeout(f))));
+                    Ok(())
+                }
+            }).map_err(|_| ());
+        self.handle.spawn(future);
+    }
 
     //fn new_user(&mut self, id: Id) {
         //info!(logger, "User {} joined", id);
@@ -347,13 +384,21 @@ impl Runner {
         let damage_val = result.map(|(target, dis_par, dis_oth)| (
             target,
             35. * (USER_RADIUS - dis_oth) / USER_RADIUS + 15., 
+            dis_par,
         ));
 
 
 
         let damage = match damage_val {
-            Some((target, val)) => {
+            Some((target, val, dis_par)) => {
                 let health_after = self.data.damage(target, val);
+
+                if health_after == 0.0f64 {
+                    self.exec_timeout(Box::new(move |s: &mut Runner| {
+                        s.user_dead(target);
+                    }), Duration::from_millis((dis_par / 300.0 * 1000.0) as u64));
+                }
+
                 Some(Damage {
                     target: target,
                     value: val,
@@ -369,6 +414,8 @@ impl Runner {
             fire: data,
             damage: damage,
         });
+
+
 
         for id in self.data.players.keys() {
             self.send(*id, &output);

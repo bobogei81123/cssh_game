@@ -7,13 +7,13 @@ import EventEmitter from 'wolfy87-eventemitter';
 import * as State from './states';
 import {GAME} from './constant';
 
-import * as ReconnectingWebsocket from 'reconnecting-websocket';
+//import * as ReconnectingWebsocket from 'reconnecting-websocket';
 
 type Point = Phaser.Point;
 const Point = Phaser.Point;
 
 export default class Main extends Phaser.Game {
-    ws: ReconnectingWebsocket;
+    ws: WebSocket;
     objects: any;
     data: GameData;
     ee: EventEmitter;
@@ -28,11 +28,12 @@ export default class Main extends Phaser.Game {
         this.state.add('room', new State.Room(this));
         this.state.add('start', new State.Start(this));
         this.state.start('boot');
+
     }
 
     connectWebsocket(): Promise<any> {
         return new Promise((resolve, reject) => {
-            this.ws = new ReconnectingWebsocket(
+            this.ws = new WebSocket(
                 `ws://${window.location.hostname}:3210`, ['rust-websocket']);
 
             this.ws.onopen = () => {
@@ -65,13 +66,15 @@ export default class Main extends Phaser.Game {
     }
 
     _receive(parsed) {
-        console.log(parsed);
         if (typeof parsed == 'string') {
             this.ee.emitEvent(parsed);
+            console.log(parsed);
             return;
         }
         const ks = Object.keys(parsed);
         if (!ks.length) return;
+
+        if (ks[0] != 'ping') console.log(parsed);
 
         const key = ks[0];
         const data = parsed[key];

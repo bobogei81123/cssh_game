@@ -12,4 +12,6 @@ pub enum Output<'a> {
     Fire(FireOut),
     Problem(ProblemOut),
     JudgeResult(bool),
+    Dead(Id),
+    TeamWin(usize),
 }

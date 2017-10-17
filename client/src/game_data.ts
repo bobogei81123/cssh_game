@@ -3,6 +3,7 @@ import * as _ from 'lodash';
 
 export default class GameData {
     id: number;
+    team: number;
     players: { [index: number]: User; };
 
     constructor(public game) {
@@ -18,7 +19,7 @@ export default class GameData {
         if (id in this.players) {
             this.removeUser(id);
         }
-        this.players[id] = new User(this.game, 'UFO1', data.pos, data.health.value, data.health.max); 
+        this.players[id] = new User(this.game, data, this.team == data.team); 
     }
 
     removeUser(id) {

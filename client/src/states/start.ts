@@ -3,6 +3,24 @@ import * as Phaser from 'phaser-ce';
 import Bullet, {Hit} from '../objects/bullet';
 import {GAME} from '../constant';
 import User from '../objects/user';
+import * as marked from 'marked';
+import * as _ from 'lodash';
+
+const renderer = new marked.Renderer();
+renderer.image = function (href, title, alt) {
+    var exec = /(.*) =(\d*%?)x(\d*%?)( \w*)?$/.exec(href);
+    console.log(href, exec);
+    if (exec) {
+        var res = '<img src="' + exec[1] + '" alt="' + alt;
+        if (exec[2]) res += '" height="' + exec[2];
+        if (exec[3]) res += '" width="' + exec[3];
+        if (exec[4] == " center")
+            res += '" style="display: block; margin: 0 auto'
+        return res + '">';
+    }
+    return `<img src="${href}" alt="${alt}">`;
+}
+
 
 const Point = Phaser.Point;
 type Point = Phaser.Point;
@@ -12,6 +30,7 @@ enum Substate {
     Ready,
     Fire,
     Resolving,
+    End,
 }
 
 export class Start extends Phaser.State {
@@ -33,6 +52,11 @@ export class Start extends Phaser.State {
     async initialize() {
         this.main.send('RequestPlayersData');
         const data = await this.main.waitForEvent('PlayersData');
+        if (_.includes(data.teams[0], this.main.data.id)) {
+            this.main.data.team = 0;
+        } else {
+            this.main.data.team = 1;
+        }
         this.main.data.syncWith(data);
         this.main.ee.on('PlayersData', this.main.data.syncWith);
         setTimeout(() => {
@@ -42,7 +66,6 @@ export class Start extends Phaser.State {
 
     registEvents() {
         this.main.ee.on('Fire', (data) => {
-            console.log(data);
             const {fire, damage} = data;
             let bullet;
             if (damage == null) {
@@ -55,6 +78,25 @@ export class Start extends Phaser.State {
             }
             bullet.fire(new Point(fire.pos.x, fire.pos.y), fire.angle);
         });
+
+        this.main.ee.on('TeamWin', (team) => {
+            const sprite = this.game.add.sprite(400, 300, (team == this.main.data.team ? 'win' : 'lose'));
+            sprite.scale.set(1.5);
+            sprite.anchor.set(0.5);
+            this.hideProblem();
+        });
+
+        this.main.ee.on('Dead', (id) => {
+            let p = this.main.data.players[id];
+            if (p != null) {
+                p.markDead();
+            }
+
+            if (id == this.main.data.id) {
+                this.substate = Substate.End;
+                this.hideProblem();
+            }
+        });
     }
 
     setProblemHTML(question, answers) {
@@ -62,7 +104,7 @@ export class Start extends Phaser.State {
         const $question = document.getElementById('question');
         const $answers = document.getElementById('answers');
 
-        $question.innerText = question;
+        $question.innerHTML = marked(question, {renderer});
         while ($answers.firstChild) $answers.removeChild($answers.firstChild);
 
         answers.forEach((answer, idx) => {
@@ -72,7 +114,10 @@ export class Start extends Phaser.State {
 
             const $content = document.createElement("div");
             $content.classList.add('message-body');
-            $content.innerText = `(${idx+1}) ${answer}`;
+
+            answer = `(${idx+1}) ` + answer;
+            const mdText = marked(answer, {renderer});
+            $content.insertAdjacentHTML('beforeend', mdText);
 
             $article.appendChild($content);
             $article.onclick = (() => {
@@ -158,6 +203,7 @@ export class Start extends Phaser.State {
             }
             case Substate.Resolving:
             case Substate.Initialize:
+            case Substate.End:
                 break;
         }
     }

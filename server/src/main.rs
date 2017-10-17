@@ -52,8 +52,13 @@ fn static_file(path: PathBuf) -> Option<NamedFile> {
     NamedFile::open(Path::new("../client/").join(path)).ok()
 }
 
+#[get("/pimg/<path..>", rank = 3)]
+fn pimg_file(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(Path::new("../problems/images/").join(path)).ok()
+}
+
 fn main() {
 
-    thread::spawn(|| rocket::ignite().mount("/", routes![hello, static_file]).launch());
+    thread::spawn(|| rocket::ignite().mount("/", routes![hello, static_file, pimg_file]).launch());
     ws::start();
 }

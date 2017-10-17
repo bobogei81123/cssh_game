@@ -28,6 +28,7 @@ pub struct Player {
     pub team: usize,
     pub pos: Point,
     pub health: Health,
+    pub alive: bool,
 
     #[serde(skip_serializing)]
     pub assigned_problem: Option<usize>,

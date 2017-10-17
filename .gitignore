@@ -4,3 +4,4 @@ Cargo.lock
 *.zip
 *.psd
 .DS_Store
+problems/
