@@ -32,3 +32,11 @@ macro_rules! consume_result {
 }
 
 
+macro_rules! ensure {
+    ($e: expr) => {
+        match $e {
+            Some(x) => x,
+            None => return,
+        }
+    }
+}

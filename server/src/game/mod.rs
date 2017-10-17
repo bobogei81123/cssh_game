@@ -29,6 +29,7 @@ use self::output::Output;
 use self::constant::*;
 use self::problem::{Problem, parse_file, ProblemOut};
 
+
 pub struct Runner {
     data: GameData,
     handle: Handle,
@@ -36,6 +37,12 @@ pub struct Runner {
     event_sink: UnboundedSender<Event>,
     rng: rand::ThreadRng,
     problems: Vec<Problem>,
+}
+
+macro_rules! require_game_state {
+    ($s: ident, $e: expr) => {
+        if $s.data.game_state != $e { return; }
+    }
 }
 
 impl Runner {
@@ -79,13 +86,9 @@ impl Runner {
 
         match self.data.game_state {
             GameState::Preparing => {
-                match self.data.users.remove(&id) {
-                    Some(user) => {
-                        let team = &mut self.data.teams[user.team];
-                        team.remove_item(&id);
-                    }
-                    None => (),
-                }
+                let user = ensure!(self.data.users.remove(&id));
+                let team = &mut self.data.teams[user.team];
+                team.remove_item(&id);
             }
             GameState::Started => {
                 if self.data.players.contains_key(&id) {
@@ -93,10 +96,6 @@ impl Runner {
                 }
             }
         }
-        //self.state.remove_user(id);
-        //for id in self.state.users.keys() {
-            //self.send(*id, &Output::SyncGameState(&self.state));
-        //}
     }
 
     fn proc_user_event(&mut self, id: Id, user_send: UserSend) {
@@ -126,6 +125,8 @@ impl Runner {
     }
 
     fn user_initial(&mut self, id: Id) {
+        require_game_state!(self, GameState::Preparing);
+
         self.data.users.insert(id, User::new(id));
         self.send(id, &Output::Initial(Initial {
             id: id,
@@ -133,9 +134,10 @@ impl Runner {
     }
 
     fn user_join_room(&mut self, id: Id, name: String) {
-        if self.data.game_state != GameState::Preparing { return; }
+        require_game_state!(self, GameState::Preparing);
 
         {
+            let user = ensure!(self.data.users.get_mut(&id));
             let teams = &mut self.data.teams;
             let team;
             if teams[0].len() <= teams[1].len() {
@@ -144,90 +146,94 @@ impl Runner {
                 team = 1;
             }
             teams[team].push(id);
-            let user = self.data.users.get_mut(&id).unwrap();
             user.team = team;
             user.name = name;
         }
 
-        for _id in self.data.users.keys() {
-            self.send(*_id, &Output::RoomData(self.data.get_room_data()));
-        }
+        self.send_all(
+            self.data.users.keys(), 
+            &Output::RoomData(self.data.get_room_data())
+        );
     }
 
     fn user_ready(&mut self, id: Id) {
-        self.data.users.get_mut(&id).unwrap().ready = true;
+        require_game_state!(self, GameState::Preparing);
+
+        {
+            let user = ensure!(self.data.users.get_mut(&id));
+            user.ready = true;
+        }
 
         if self.data.users.values().all(|x| x.ready) {
-            self.all_user_ready();
-        }
-    }
-
-    fn all_user_ready(&mut self) {
-        self.game_start();
-        for id in self.data.players.keys() {
-            self.send(*id, &Output::GameStart);
+            self.game_start();
         }
     }
 
     fn game_start(&mut self) {
+        require_game_state!(self, GameState::Preparing);
         info!(logger, "Game start!");
-        self.data.game_state = GameState::Started;
 
         let mut users = HashMap::new();
         mem::swap(&mut users, &mut self.data.users);
 
-        self.data.players = users.into_iter().map({
-            let mut pts = vec![];
-            let rng = &mut self.rng;
 
-            move |(id, user)| {
-                loop {
-                    let pos = Point {
-                        x: ((rng.next_u32() as f64) % (GAME_WIDTH - 100.) + 50.) as f64,
-                        y: ((rng.next_u32() as f64) % (GAME_HEIGHT - 100.) + 50.) as f64,
+        self.data.players = {
+            let mut generate_point = || Point {
+                x: ((self.rng.next_u32() as f64) % 
+                    (GAME_WIDTH - GAME_WIDTH_MARGIN) + GAME_WIDTH_MARGIN/2.) as f64,
+                y: ((self.rng.next_u32() as f64) %
+                    (GAME_HEIGHT - GAME_HEIGHT_MARGIN) + GAME_HEIGHT_MARGIN/2.) as f64,
+            };
+
+            users.into_iter().map({
+                let mut pts = vec![];
+
+                move |(id, user)| {
+                    let pos = loop {
+                        let pos = generate_point();
+                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 50.0) { 
+                            pts.push(pos);
+                            break pos; 
+                        }
                     };
 
-                    if pts.iter().all(|p: &Point| (*p - pos).abs() >= 10.0) { 
-                        pts.push(pos);
-                        break; 
-                    }
+                    (id, Player {
+                        id: user.id,
+                        name: user.name,
+                        team: user.team,
+                        pos: pos,
+                        health: Health {
+                            max: 100.,
+                            value: 100.,
+                        },
+                        assigned_problem: None,
+                        state: UserState::Waiting,
+                        alive: true,
+                    })
                 }
+            }).collect()
+        };
 
-                (id, Player {
-                    id: user.id,
-                    name: user.name,
-                    team: user.team,
-                    pos: Point {
-                        x: ((rng.next_u32() as f64) % (GAME_WIDTH - 100.) + 50.) as f64,
-                        y: ((rng.next_u32() as f64) % (GAME_HEIGHT - 100.) + 50.) as f64,
-                    },
-                    health: Health {
-                        max: 100.,
-                        value: 100.,
-                    },
-                    assigned_problem: None,
-                    state: UserState::Waiting,
-                    alive: true,
-                })
-            }
-        }).collect();
+        self.data.game_state = GameState::Started;
+        self.send_all(self.data.players.keys(), &Output::GameStart);
     }
 
     fn assign_problem(&mut self, id: Id) {
+        require_game_state!(self, GameState::Started);
         let prob = {
-            let user = self.data.players.get_mut(&id).unwrap();
+            let user = ensure!(self.data.players.get_mut(&id));
 
-            let id = match user.assigned_problem {
-                Some(id) => id,
+            let pid = match user.assigned_problem {
+                Some(pid) => pid,
                 None => {
                     let n = self.problems.len();
                     self.rng.gen_range(0, n)
                 }
             };
 
-            user.assigned_problem = Some(id);
+            user.assigned_problem = Some(pid);
 
-            &self.problems[id]
+            &self.problems[pid]
         };
 
         let output = Output::Problem(ProblemOut {
@@ -243,26 +249,15 @@ impl Runner {
     }
 
     fn answer(&mut self, id: Id, answer: usize) {
-        let problem_id = self.data.players.get(&id).unwrap().assigned_problem;
-        let problem_id = match problem_id {
-            None => { return; }
-            Some(pid) => pid
-        };
-        let result = answer == self.problems[problem_id].correct;
-        self.send(id, &Output::JudgeResult(result));
-        
-        {
-            let user = self.data.players.get_mut(&id).unwrap();
+        require_game_state!(self, GameState::Started);
 
-            if result {
-                user.state = UserState::Firing;
-            } else {
-                user.state = UserState::Penalizing;
-            }
-
+        let result = {
+            let user = ensure!(self.data.players.get_mut(&id));
+            let problem_id = ensure!(user.assigned_problem);
             user.assigned_problem = None;
-        }
-
+            answer == self.problems[problem_id].correct
+        };
+        self.send(id, &Output::JudgeResult(result));
         //if (!result) {
             //self.exec_timeout(Box::new(move |s: &mut Runner| {
                 //s.get_mut_user(id).unwrap().state = UserState::Waiting;
@@ -271,6 +266,8 @@ impl Runner {
     }
 
     fn user_dead(&mut self, id: Id) {
+        require_game_state!(self, GameState::Started);
+
         self.data.players.get_mut(&id).unwrap().alive = false;
         for jd in self.data.players.keys() {
             self.send(*jd, &Output::Dead(id));
@@ -279,6 +276,8 @@ impl Runner {
     }
 
     fn check_win(&mut self) {
+        require_game_state!(self, GameState::Started);
+
         for i in (0..2) {
             if self.data.teams[i].iter().all(|p| !self.data.players.get(&p).unwrap().alive) {
                 self.team_win(1 - i);
@@ -288,15 +287,15 @@ impl Runner {
     }
 
     fn team_win(&mut self, team: usize) {
-        for player in self.data.players.keys() {
-            self.send(*player, &Output::TeamWin(team));
-        }
+        require_game_state!(self, GameState::Started);
 
+        info!(logger, "Team #{} won!", team);
+        self.send_all(self.data.players.keys(), &Output::TeamWin(team));
         self.finalize();
     }
 
     fn finalize(&mut self) {
-        self.data.players.clear();
+        self.data = GameData::new();
     }
 
     fn exec_timeout<F>(&self, f: Box<F>, duration: Duration)
@@ -313,35 +312,6 @@ impl Runner {
         self.handle.spawn(future);
     }
 
-    //fn new_user(&mut self, id: Id) {
-        //info!(logger, "User {} joined", id);
-        //if self.state.users.contains_key(&id) {
-            //return;
-        //}
-
-        //let new_user = User {
-            //id: id,
-            //pos: Point {
-                //x: ((self.rng.next_u32() as f64) % (GAME_WIDTH - 100.) + 50.) as f64,
-                //y: ((self.rng.next_u32() as f64) % (GAME_HEIGHT - 100.) + 50.) as f64,
-            //},
-            //health: Health {
-                //max: 100.,
-                //value: 100.,
-            //},
-            //assigned_problem: None,
-            //state: UserState::Waiting,
-        //};
-
-        //self.state.add_user(new_user);
-
-        //self.send(id, &Output::Initial(Initial { your_id: id }));
-
-        //for id in self.state.users.keys() {
-            //self.send(*id, &Output::SyncGameState(&self.state));
-        //}
-    //}
-
     fn _get_distant_to_line(o: Point, angle: f64, x: Point) -> (f64, f64) {
         let unit = Point::from_angle(angle);
         let d = x - o;
@@ -352,45 +322,39 @@ impl Runner {
     }
 
     fn user_fire(&mut self, id: Id, data: Fire) {
+        require_game_state!(self, GameState::Started);
+        let (my_pos, my_team) = {
+            let player = ensure!(self.data.players.get(&id));
+            (player.pos, player.team)
+        };
 
         let my_pos = self.data.players.get(&id).unwrap().pos;
 
-        let result = self.data.players.values().fold(
-            None,
-            |x, player| {
-                let target = player.id;
-                if target == id { return x; }
-                let (dis_par, dis_oth) = Self::_get_distant_to_line(
-                    my_pos, data.angle, player.pos
-                );
+        let result = self.data.players.values()
+            .filter(|x| x.alive && x.team != my_team)
+            .fold(None,
+                |x, player| {
+                    let (dis_par, dis_oth) = Self::_get_distant_to_line(
+                        my_pos, data.angle, player.pos
+                    );
 
-                if dis_par < 0. || dis_oth > USER_RADIUS { return x; }
+                    if dis_par < 0. || dis_oth > USER_RADIUS { return x; }
 
-                match x {
-                    None => Some((target, dis_par, dis_oth)),
-                    Some(best) => {
-                        let (_, best_par, _) = best;
-                        if best_par > dis_par { Some((target, dis_par, dis_oth)) }
-                        else { Some(best) }
+                    match x {
+                        None => Some((player.id, dis_par, dis_oth)),
+                        Some(best) => {
+                            let (_, best_par, _) = best;
+                            if best_par > dis_par { Some((player.id, dis_par, dis_oth)) }
+                            else { Some(best) }
+                        }
                     }
                 }
-            }
-        );
-
-        //let damage_val = result.map(|(_, _, d)
-            //40 * (USER_RADIUS - d) / USER_RADIUS + 10; 
-        //)
-
-        let damage_val = result.map(|(target, dis_par, dis_oth)| (
-            target,
-            35. * (USER_RADIUS - dis_oth) / USER_RADIUS + 15., 
-            dis_par,
-        ));
+            );
 
 
-
-        let damage = match damage_val {
-            Some((target, val, dis_par)) => {
+        let damage = match result {
+            Some((target, dis_par, dis_oth)) => {
+                let val = 35. * (USER_RADIUS - dis_oth) / USER_RADIUS + 15.;
                 let health_after = self.data.damage(target, val);
 
                 if health_after == 0.0f64 {
@@ -430,5 +394,12 @@ impl Runner {
         self.handle.spawn(consume_result!(
             self.output_sink.clone().send((id, OwnedMessage::Text(msg)))
         ));
+    }
+
+    fn send_all<'a, 'b, T>(&self, iter: T, msg: &'b Output)
+        where T: Iterator<Item=&'a Id> {
+        for id in iter {
+            self.send(*id, msg);
+        }
     }
 }

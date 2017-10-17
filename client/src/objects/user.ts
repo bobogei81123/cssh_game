@@ -30,23 +30,23 @@ export default class User extends Phaser.Sprite {
         this.maxHealth = health.max;
         this.friend = friend;
 
-        const healthBar = new Phaser.Graphics(game, 0, -20);
+        const healthBar = new Phaser.Graphics(game, 0, -USER.RADIUS);
         this.healthBar = healthBar;
         this.addChild(healthBar);
 
         const arrow = new Phaser.Graphics(this.game, 0, 0);
-        arrow.beginFill(0x33aaff);
+        arrow.beginFill(0xffff33);
         arrow.drawTriangle([
-            new Point(25, -4),
-            new Point(25, 4),
-            new Point(35, 0),
+            new Point(30, -5),
+            new Point(30, 5),
+            new Point(40, 0),
         ]);
         arrow.visible = false;
         this.arrow = arrow;
         this.addChild(arrow);
 
         console.log(this.name);
-        const name_text = new Phaser.Text(this.game, 0, 22, this.name, {fontSize: 10, fill: 'white'});
+        const name_text = new Phaser.Text(this.game, 0, USER.RADIUS+2, this.name, {fontSize: 10, fill: 'white'});
         name_text.anchor.set(0.5);
         this.addChild(name_text);
 
@@ -103,7 +103,7 @@ export default class User extends Phaser.Sprite {
     markDead() {
         const dead = new Phaser.Sprite(this.game, 0, 0, 'dead');
         dead.anchor.set(0.5);
-        dead.scale.set(0.3);
+        dead.scale.set(0.2);
         this.addChild(dead);
     }
 }
