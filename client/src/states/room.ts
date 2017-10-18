@@ -18,8 +18,8 @@ export class Room extends Phaser.State {
         this.button.onInputUp.addOnce(() => {
             this.main.send('Ready');
         });
-        this.game.world.add(this.data_shower);
-        this.game.world.add(this.button);
+        this.game.world.addChild(this.data_shower);
+        this.game.world.addChild(this.button);
 
         this.func = (data) => {
             this.data_shower.updateWithData(data);

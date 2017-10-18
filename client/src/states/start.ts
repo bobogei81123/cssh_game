@@ -84,6 +84,13 @@ export class Start extends Phaser.State {
             sprite.scale.set(1.5);
             sprite.anchor.set(0.5);
             this.hideProblem();
+            button = new BackButton(this.game, 400, 520);
+            button.onInputUp.addOnce(() => {
+                sprite.destroy();
+                this.game.world.removeChild(button);
+                this.game.state.start('room');
+            });
+            this.game.world.addChild(button);
         });
 
         this.main.ee.on('Dead', (id) => {
