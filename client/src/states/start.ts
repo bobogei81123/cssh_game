@@ -1,6 +1,7 @@
 import Main from '../main';
 import * as Phaser from 'phaser-ce';
 import Bullet, {Hit} from '../objects/bullet';
+import BackButton from '../objects/back_button.ts';
 import {GAME} from '../constant';
 import User from '../objects/user';
 import * as marked from 'marked';
@@ -58,7 +59,7 @@ export class Start extends Phaser.State {
             this.main.data.team = 1;
         }
         this.main.data.syncWith(data);
-        this.main.ee.on('PlayersData', this.main.data.syncWith);
+        this.main.ee.on('PlayersData', (data) => this.main.data.syncWith(data));
         setTimeout(() => {
             this.substate = Substate.Ready;
         }, 2000);
@@ -84,11 +85,11 @@ export class Start extends Phaser.State {
             sprite.scale.set(1.5);
             sprite.anchor.set(0.5);
             this.hideProblem();
-            button = new BackButton(this.game, 400, 520);
+            const button = new BackButton(this.game, 400, 540);
             button.onInputUp.addOnce(() => {
                 sprite.destroy();
                 this.game.world.removeChild(button);
-                this.game.state.start('room');
+                this.game.state.start('boot');
             });
             this.game.world.addChild(button);
         });
@@ -218,5 +219,9 @@ export class Start extends Phaser.State {
             case Substate.End:
                 break;
         }
+    }
+
+    shutdown() {
+        this.main.ee.removeAllListeners('PlayersData');
     }
 }

@@ -1,5 +1,6 @@
 import Main from '../main';
 import * as Phaser from 'phaser-ce';
+import GameData from '../game_data';
 
 export class Boot extends Phaser.State {
     constructor(public main: Main) {
@@ -65,6 +66,7 @@ export class Boot extends Phaser.State {
     }
 
     async initialize() {
+        this.main.data = new GameData(this.main);
         await this.main.connectWebsocket();
 
         this.main.ee.on('ping', (data) => {

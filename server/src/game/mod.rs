@@ -199,7 +199,7 @@ impl Runner {
                 move |(id, user)| {
                     let pos = loop {
                         let pos = generate_point();
-                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 80.0) { 
+                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 100.0) { 
                             pts.push(pos);
                             break pos; 
                         }

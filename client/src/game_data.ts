@@ -15,6 +15,7 @@ export default class GameData {
     }
 
     addUser(data) {
+        console.log(data);
         const id = data.id;
         if (id in this.players) {
             this.removeUser(id);
@@ -40,6 +41,7 @@ export default class GameData {
     }
 
     syncWith(data) {
+        console.log(this);
         const shouldRemove = _.difference(_.keys(this.players), _.keys(data.players));
         const shouldAdd = _.difference(_.keys(data.players), _.keys(this.players));
         const shouldSync = _.intersection(_.keys(data.players), _.keys(this.players));

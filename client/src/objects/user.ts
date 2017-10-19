@@ -45,7 +45,6 @@ export default class User extends Phaser.Sprite {
         this.arrow = arrow;
         this.addChild(arrow);
 
-        console.log(this.name);
         const name_text = new Phaser.Text(this.game, 0, USER.RADIUS+2, this.name,
             {fontSize: 10, fill: (this.friend ? '#99AAFF' : '#FF6666')});
         name_text.anchor.set(0.5);
