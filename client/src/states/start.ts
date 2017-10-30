@@ -155,30 +155,30 @@ export class Start extends Phaser.State {
         tween.start();
     }
 
-    startFire() {
+    async startFire() {
         console.log('start fire');
-        return new Promise((resolve, reject) => {
-            const hint = this.game.add.text(400, 20, '點擊任意一處開始描準', {fill: 'white', fontSize: 20});
-            hint.anchor.set(0.5);
+        const hint = this.game.add.text(400, 20, '點擊任意一處開始描準', {fill: 'white', fontSize: 20});
+        hint.anchor.set(0.5);
 
+        const generateClickPromise = () => (new Promise((resolve, reject) => {
             this.input.onDown.addOnce(() => {
-                hint.text = '再次點擊往箭頭方向射擊';
-                const promise = new Promise((resolve, reject) => {
-                    const me = this.main.data.me();
-                    me.startSpin();
-                    this.input.onDown.addOnce(() => resolve(me));
-                }).then((me: User) => {
-                    hint.destroy();
-                    const [pos, angle] = me.stopSpin();
-                    this.main.send({
-                        Fire: {
-                            pos: pos,
-                            angle: angle,
-                        }
-                    });
-                    resolve();
-                });
-            }, this);
+                resolve();
+            });
+        }));
+
+        await generateClickPromise();
+
+        hint.text = '再次點擊往箭頭方向射擊';
+        
+        const me = this.main.data.me();
+        const [pos, angle] = await me.startSpin(generateClickPromise());
+
+        await me.rotateAndFire(angle);
+        this.main.send({
+            Fire: {
+                pos: pos,
+                angle: angle,
+            }
         });
     }
 

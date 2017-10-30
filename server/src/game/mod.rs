@@ -199,7 +199,7 @@ impl Runner {
                 move |(id, user)| {
                     let pos = loop {
                         let pos = generate_point();
-                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 100.0) { 
+                        if pts.iter().all(|p: &Point| (*p - pos).abs() >= 80.0) { 
                             pts.push(pos);
                             break pos; 
                         }
@@ -362,7 +362,7 @@ impl Runner {
 
         let damage = match result {
             Some((target, dis_par, dis_oth)) => {
-                let val = 35. * (USER_RADIUS - dis_oth) / USER_RADIUS + 15.;
+                let val = 35. * (USER_RADIUS - dis_oth) / USER_RADIUS + 25.;
                 let health_after = self.data.damage(target, val);
 
                 if health_after == 0.0f64 {

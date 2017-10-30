@@ -13,9 +13,11 @@ export class Boot extends Phaser.State {
 
         this.load.spritesheet('explosion', 'assets/explosion.png', 64, 64);
 
-        for (let i=1; i<=4; i++) {
-            this.load.spritesheet(`UFO${i}`, `assets/UFO_40x30/${i}.png`, 40, 30, 4);
-        }
+        //for (let i=1; i<=4; i++) {
+            //this.load.spritesheet(`UFO${i}`, `assets/UFO_40x30/${i}.png`, 40, 30, 4);
+        //}
+        this.load.image('ship-ally', 'assets/kenny/playerShip1_blue.png');
+        this.load.image('ship-enemy', 'assets/kenny/playerShip2_red.png');
 
         this.load.image('bullet10', 'assets/bullet10.png');
         this.load.image('check', 'assets/check.png');
@@ -36,9 +38,10 @@ export class Boot extends Phaser.State {
     }
 
     makeView() {
-        this.game.add.sprite(0, 0, 'background_far');
+        let backgroundFar = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_far');
+        backgroundFar.autoScroll(-3, 0);
         let backgroundNear = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_near');
-        backgroundNear.autoScroll(-20, 0);
+        backgroundNear.autoScroll(-15, 0);
 
         this.game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
         this.game.scale.refresh();

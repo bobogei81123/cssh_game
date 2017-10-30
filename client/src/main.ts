@@ -7,8 +7,6 @@ import EventEmitter from 'wolfy87-eventemitter';
 import * as State from './states';
 import {GAME} from './constant';
 
-//import * as ReconnectingWebsocket from 'reconnecting-websocket';
-
 type Point = Phaser.Point;
 const Point = Phaser.Point;
 
@@ -19,7 +17,7 @@ export default class Main extends Phaser.Game {
     ee: EventEmitter;
 
     constructor() {
-        super(GAME.WIDTH, GAME.HEIGHT, Phaser.AUTO, 'content');
+        super(GAME.WIDTH, GAME.HEIGHT, Phaser.WEBGL, 'content');
 
         this.data = new GameData(this);
         this.ee = new EventEmitter<string>();

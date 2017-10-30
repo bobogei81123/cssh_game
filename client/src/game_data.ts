@@ -34,10 +34,7 @@ export default class GameData {
         if (!(id in this.players)) return;
 
         const user = this.players[id];
-        user.position.x = data.pos.x;
-        user.position.y = data.pos.y;
-        user.health = data.health.value;
-        user.maxHealth = data.health.max;
+        user.syncWith(data);
     }
 
     syncWith(data) {
@@ -60,6 +57,6 @@ export default class GameData {
     }
 
     setHealth(id, val) {
-        this.players[id].health = val;
+        this.players[id].health.set(val);
     }
 }

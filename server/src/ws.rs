@@ -77,7 +77,7 @@ impl<T> SinkStream<T> {
 struct MainServer {
     core: Core,
     id_counter: Rc<RefCell<Counter>>,
-    connections: Arc<RwLock<HashMap<Id, Option<MyClient>>>>,
+    connections: Arc<RwLock<HashMap<Id, MyClient>>>,
     init_channel: SinkStream<(Id, SplitStream<Client<TcpStream>>)>,
     send_channel: SinkStream<(Id, OwnedMessage)>,
     event_channel: SinkStream<Event>,
@@ -133,16 +133,14 @@ impl MainServer {
 
                     let connect_fun = capture!(
                         connections, id_counter, init_sink, handle =>
-                        
-                        |(client, _)| {
-
+                        move |(client, _)| {
                             info!(logger, "A client connected"; "ip" => addr.to_string());
                             let id = id_counter.borrow_mut().next().unwrap();
                             let client: Client<TcpStream> = client;
                             let (sink, stream) = client.split();
                             
                             Self::spawn(&handle, init_sink.send((id, stream)));
-                            connections.write().unwrap().insert(id, Some(sink));
+                            connections.write().unwrap().insert(id, sink);
 
                             Ok(id)
                         }
@@ -151,7 +149,7 @@ impl MainServer {
                     let send_fun = capture!(
                         event_sink, handle =>
 
-                        |id| {
+                        move |id| {
                             Self::spawn(&handle, event_sink.send(Event::Connect(id)));
                             Ok(())
                         }
@@ -182,46 +180,35 @@ impl MainServer {
 
             move || {
 
-                send_stream.for_each(move |(id, msg): (Id, OwnedMessage)| {
+                send_stream.and_then(capture!(connections =>
+                        move |(id, msg)| -> Box<Future<Item=Option<(MyClient, Id)>, Error=()> + Send> {
                     let mut conn = connections.write().unwrap();
-                    let conn = conn.get_mut(&id);
+                    let conn = conn.remove(&id);
 
                     match conn {
-                        Some(client) => {
-                            let client = client.take();
-                            let remote = remote.clone();
-
-                            match client {
-                                Some(sink) => {
-                                    let _msg: OwnedMessage = msg.clone();
-                                    let future = sink.send(msg)
-                                        .and_then(
-                                            capture!(connections => |sink| {
-                                                let mut entry = connections.write().unwrap();
-                                                let entry = entry.get_mut(&id).unwrap();
-                                                *entry = Some(sink);
-                                                Ok(())
-                                            })
-                                        ).map_err(
-                                            capture!(connections, event_sink, remote => |_| {
-                                                connections.write().unwrap().remove(&id);
-                                                Self::spawn_remote(&remote,
-                                                                   event_sink.send(Event::Disconnect(id)));
-                                            })
-                                        );
-                                    Self::spawn_remote(&remote, future);
-                                }
-                                None => {
-                                    Self::spawn_remote(&remote, send_sink.clone().send((id, msg)));
-                                }
-                            }
+                        Some(sink) => {
+                            Box::new(sink.send(msg)
+                                .map(move |sink| Some((sink, id)))
+                                .or_else(
+                                    capture!(connections, event_sink, remote => move |_| {
+                                        connections.write().unwrap().remove(&id);
+                                        Self::spawn_remote(&remote,
+                                                           event_sink.send(Event::Disconnect(id)));
+                                        Ok(None)
+                                    })
+                                ))
                         }
                         None => {
                             warn!(logger, "Try to send to dead client {}", id);
+                            Box::new(future::ok(None))
                         }
                     }
+                })).for_each(capture!(connections => move |opt| {
+                    if let Some((sink, id)) = opt {
+                        connections.write().unwrap().insert(id, sink);
+                    }
                     Ok(())
-                })
+                }))
             }
         })
     }
@@ -240,7 +227,7 @@ impl MainServer {
             move || {
                 init_stream.for_each(move |(id, stream)| {
                     Self::spawn_remote(&remote,
-                        pool.spawn_fn(capture!(event_sink, send_sink, remote, connections => || {
+                        pool.spawn_fn(capture!(event_sink, send_sink, remote, connections => move || {
 
                             let message_fun = move |msg| {
                                 match msg {

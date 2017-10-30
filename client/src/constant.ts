@@ -4,10 +4,9 @@ export let GAME = {
 }
 
 export let USER =  {
-    HEALTHBAR_WIDTH: 30,
+    HEALTHBAR_WIDTH: 40,
     HEALTHBAR_HEIGHT: 2,
     HZ: 0.45,
     UPDATE_TICK: 0.016,
     RADIUS: 25,
-    BASE_RADIUS: 15,
 };

@@ -13,6 +13,7 @@
     "marked": "^0.3.6",
     "phaser-ce": "^2.9.0",
     "reconnecting-websocket": "^3.2.2",
+    "uglifyjs-webpack-plugin": "^1.0.0-beta.3",
     "wolfy87-eventemitter": "^5.2.3"
   },
   "devDependencies": {

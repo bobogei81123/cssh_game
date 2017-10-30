@@ -1,14 +1,8 @@
 macro_rules! capture {
-    ($($n: ident),* => || $body:expr) => (
+    ($($n: ident),* => $body:expr) => (
         {
             $( let $n = $n.clone(); )*
-            move || $body
-        }
-    );
-    ($($n: ident),* => |$($p:tt),*| $body:expr) => (
-        {
-            $( let $n = $n.clone(); )*
-            move |$($p),*| $body
+            $body
         }
     );
     //($($n: ident),* => |$($p:tt : $typ: typ),*| $body:expr) => (

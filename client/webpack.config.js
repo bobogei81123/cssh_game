@@ -1,4 +1,5 @@
 const path = require('path');
+const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
 
 const phaserRoot = path.join(__dirname, 'node_modules/phaser-ce/build/custom/');
 
@@ -27,5 +28,8 @@ module.exports = {
             { test: /phaser-split.js/, loader: 'script-loader' },
             { test: /\.tsx?$/, loader: 'ts-loader' },
         ]
-    }
+    },
+    plugins: [
+        //new UglifyJSPlugin()
+    ]
 }
