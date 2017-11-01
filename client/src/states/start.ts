@@ -36,10 +36,12 @@ enum Substate {
 
 export class Start extends Phaser.State {
     substate: Substate;
+    dead: boolean;
 
     constructor(public main: Main) {
         super();
         this.substate = Substate.Initialize;
+        this.dead = false;
     }
 
     init() {
@@ -101,6 +103,7 @@ export class Start extends Phaser.State {
             }
 
             if (id == this.main.data.id) {
+                this.dead = true;
                 this.substate = Substate.End;
                 this.hideProblem();
             }
@@ -208,6 +211,10 @@ export class Start extends Phaser.State {
                 break;
             }
             case Substate.Fire: {
+                if (this.dead) {
+                    this.substate = Substate.End;
+                    return;
+                }
                 this.substate = Substate.Resolving;
                 (async () => {
                     await this.startFire();

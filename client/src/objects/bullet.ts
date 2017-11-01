@@ -16,7 +16,7 @@ export default class Bullet extends Phaser.Sprite {
     constructor(game: Phaser.Game, public hit?: Hit) {
         super(game, 0, 0, 'bullet10');
         this.game.physics.arcade.enable(this);
-        this.texture.baseTexture.scaleMode = PIXI.scaleModes.NEAREST;
+        this.scale.set(0.8);
 
         this.anchor.set(0.5);
 

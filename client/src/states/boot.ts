@@ -8,26 +8,30 @@ export class Boot extends Phaser.State {
     }
 
     preload() {
-        this.load.image('background_far', 'assets/background/farback.gif');
-        this.load.image('background_near', 'assets/background/starfield.png');
+        this.load.baseURL = 'assets/';
+        this.load.image('background_far', 'background/farback.gif');
+        this.load.image('background_near', 'background/starfield.png');
 
-        this.load.spritesheet('explosion', 'assets/explosion.png', 64, 64);
+        this.load.spritesheet('explosion', 'explosion.png', 64, 64);
 
-        //for (let i=1; i<=4; i++) {
-            //this.load.spritesheet(`UFO${i}`, `assets/UFO_40x30/${i}.png`, 40, 30, 4);
-        //}
-        this.load.image('ship-ally', 'assets/kenny/playerShip1_blue.png');
-        this.load.image('ship-enemy', 'assets/kenny/playerShip2_red.png');
+        this.load.image('ship-ally', 'kenny/playerShip1_blue.png');
+        this.load.image('ship-enemy', 'kenny/playerShip2_red.png');
 
-        this.load.image('bullet10', 'assets/bullet10.png');
-        this.load.image('check', 'assets/check.png');
-        this.load.image('cross', 'assets/cross.png');
-        this.load.image('button', 'assets/button.png');
-        this.load.image('button-dark', 'assets/button-dark.png');
+        this.load.image('bullet10', 'bullet10.png');
+        this.load.image('check', 'check.png');
+        this.load.image('cross', 'cross.png');
+        this.load.image('button', 'button.png');
+        this.load.image('button-dark', 'button-dark.png');
 
-        this.load.image('win', 'assets/misc/win.png');
-        this.load.image('lose', 'assets/misc/lose.png');
-        this.load.image('dead', 'assets/misc/dead.png');
+        this.load.image('win', 'misc/win.png');
+        this.load.image('lose', 'misc/lose.png');
+        this.load.image('dead', 'misc/dead.png');
+
+        this.load.atlasXML('ui',
+            'uipack-space/Spritesheet/uipackSpace_sheet.png',
+            'uipack-space/Spritesheet/uipackSpace_sheet.xml',)
+
+        this.load.image('vs', 'misc/vs.png');
     }
 
     create() {
@@ -82,26 +86,5 @@ export class Boot extends Phaser.State {
 
         const name = await this.enterName();
         this.game.state.start('room', false, false, name);
-        //const getInit = new Promise((resolve, reject) => {
-            //this.main.ee.once('Initial', (data) => {
-                //this.main.data.my_id = data.your_id;
-                //resolve();
-            //});
-        //});
-        //const getStateSync = new Promise((resolve, reject) => {
-            //this.main.ee.once('SyncGameState', (data) => {
-                //this.main.data.syncWith(data);
-                //resolve();
-            //});
-        //});
-
-        //this.main.connectWebsocket();
-        //this.main.ws.onopen = () => {
-            //this.main.send('Join');
-            //this.main.ws.onopen = null;
-        //}
-        //let combined = Promise.all([getInit, getStateSync]);
-        //combined.then(() => this.game.state.start('start', false));
-
     }
 }
