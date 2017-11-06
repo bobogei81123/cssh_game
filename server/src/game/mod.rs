@@ -39,6 +39,7 @@ pub struct Runner {
     output_sink: WrappedSender,
     rng: rand::ThreadRng,
     problems: Vec<Problem>,
+    logger: Logger,
 }
 
 macro_rules! require_game_state {
@@ -51,6 +52,7 @@ impl Runner {
     pub fn new(
         handle: Handle,
         output_sink: WrappedSender,
+        logger: Logger,
     ) -> Self {
         Self {
             data: GameData::new(),
@@ -58,6 +60,7 @@ impl Runner {
             output_sink: output_sink,
             rng: rand::thread_rng(),
             problems: vec![],
+            logger: logger,
         }
     }
 
@@ -93,7 +96,7 @@ impl Runner {
 
     #[allow(unused_variables)]
     fn user_disconnect(&mut self, id: Id) {
-        info!(logger, "User {} disconnected", id);
+        info!(self.logger, "User {} disconnected", id);
 
         match self.data.game_state {
             GameState::Preparing => {
@@ -190,7 +193,7 @@ impl Runner {
 
     fn game_start(&mut self) {
         require_game_state!(self, GameState::Preparing);
-        info!(logger, "Game start!");
+        info!(self.logger, "Game start!");
 
         let mut users = HashMap::new();
         mem::swap(&mut users, &mut self.data.users);
@@ -308,7 +311,7 @@ impl Runner {
     fn team_win(&mut self, team: usize) {
         require_game_state!(self, GameState::Started);
 
-        info!(logger, "Team #{} won!", team);
+        info!(self.logger, "Team #{} won!", team);
         self.send_all(self.data.players.keys().chain(self.data.spectators.iter()), &Output::TeamWin(team));
         self.finalize();
     }
@@ -421,17 +424,25 @@ impl Runner {
 }
 
 use ws::WsServer;
+use slog::Logger;
 
 pub struct GameServer {
+    logger: Logger
 }
 
 impl GameServer {
+    pub fn new(logger: Logger) -> Self {
+        Self {
+            logger: logger,
+        }
+    }
+
     pub fn start(mut self) {
         let mut core = Core::new().expect("Failed to create event loop");
-        let mut ws_server = WsServer::new();
+        let mut ws_server = WsServer::new(self.logger.new(o!("who" => "WS")));
         let (stream, sink) = ws_server.take();
         let ws_future = ws_server.get_future(&core);
-        let mut runner = Runner::new(core.handle(), sink);
+        let mut runner = Runner::new(core.handle(), sink, self.logger.new(o!("who" => "Runner")));
         runner.init();
         let runner_future = runner.get_future(stream);
 

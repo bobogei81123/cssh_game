@@ -2,9 +2,6 @@
 #![plugin(rocket_codegen)]
 #![feature(conservative_impl_trait, type_ascription, fnbox, vec_remove_item)]
 
-#[macro_use]
-extern crate lazy_static;
-
 extern crate rand;
 
 extern crate itertools;
@@ -35,9 +32,14 @@ use rocket::response::NamedFile;
 
 #[macro_use] mod macro_utils;
 mod common;
+use common::*;
+
 mod event;
 mod ws;
 mod game;
+
+mod logger;
+use logger::make_logger;
 
 #[get("/")]
 fn hello() -> Option<NamedFile> {
@@ -56,6 +58,7 @@ fn pimg_file(path: PathBuf) -> Option<NamedFile> {
 
 fn main() {
     thread::spawn(|| rocket::ignite().mount("/", routes![hello, static_file, pimg_file]).launch());
-    let server = game::GameServer {};
+    let logger = make_logger();
+    let server = game::GameServer::new(logger);
     server.start();
 }

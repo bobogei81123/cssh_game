@@ -14,10 +14,10 @@ use self::byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 use tokio_core::reactor::{Core, Handle, Remote};
 use tokio_core::net::TcpStream;
 
-use futures::{Future, Stream, Sink, StartSend};
+use futures::{Future, Stream, Sink};
 use futures::future::{self, Loop, Either};
 use futures::stream::{SplitSink, SplitStream};
-use futures::sync::mpsc::{self, UnboundedSender, UnboundedReceiver};
+use futures::sync::mpsc::UnboundedReceiver;
 
 use futures_cpupool::CpuPool;
 
@@ -25,10 +25,7 @@ use websocket::async::{Server, Client};
 use websocket::message::OwnedMessage;
 use websocket::server::InvalidConnection;
 
-use serde_json;
-
 use common::*;
-
 
 type MyClient = SplitSink<Client<TcpStream>>;
 
@@ -47,6 +44,7 @@ pub struct WsServer {
     init_channel: SinkStream<(Id, SplitStream<Client<TcpStream>>)>,
     send_channel: SinkStream<(Id, OwnedMessage)>,
     event_channel: SinkStream<WsEvent>,
+    logger: Logger,
 }
 
 pub enum WsEvent {
@@ -57,7 +55,7 @@ pub enum WsEvent {
 }
 
 impl WsServer {
-    pub fn new() -> Self {
+    pub fn new(logger: Logger) -> Self {
 
         Self {
             id_counter: Rc::new(RefCell::new(Counter::new())),
@@ -65,6 +63,7 @@ impl WsServer {
             init_channel: SinkStream::new(),
             send_channel: SinkStream::new(),
             event_channel: SinkStream::new(),
+            logger: logger,
         }
     }
 
@@ -91,6 +90,7 @@ impl WsServer {
                 let id_counter = self.id_counter.clone();
                 let init_sink = self.init_channel.sink.clone();
                 let event_sink = self.event_channel.sink.clone();
+                let logger = self.logger.clone();
                 let handle = handle.clone();
 
                 move |(upgrade, addr)| {
@@ -103,7 +103,7 @@ impl WsServer {
                     }
 
                     let connect_fun = capture!(
-                        connections, id_counter, init_sink, handle =>
+                        connections, id_counter, init_sink, handle, logger =>
                         move |(client, _): (Client<TcpStream>, _)| {
                             info!(logger, "A client connected"; "ip" => addr.to_string());
                             let id = id_counter.borrow_mut().next().unwrap();
@@ -145,6 +145,7 @@ impl WsServer {
             let send_sink = self.send_channel.sink.clone();
             let event_sink = self.event_channel.sink.clone();
             let connections = self.connections.clone();
+            let logger = self.logger.clone();
             let remote = remote.clone();
 
             move || {
