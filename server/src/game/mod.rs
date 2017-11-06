@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
-use futures::sync::mpsc::UnboundedSender;
-use tokio_core::reactor::{Handle, Timeout};
+use futures::sync::mpsc::{self, UnboundedSender};
+use tokio_core::reactor::{Core, Handle, Timeout};
 use futures::{Future, Sink};
 use rand::{self, Rng};
 use std::boxed::FnBox;
@@ -28,13 +28,15 @@ use self::state::*;
 use self::output::Output;
 use self::constant::*;
 use self::problem::{Problem, parse_file, ProblemOut};
-
+use futures::sync::mpsc::UnboundedReceiver;
+use futures::Stream;
+use ws::wrapped_sender::WrappedSender;
+use ws::WsEvent;
 
 pub struct Runner {
     data: GameData,
     handle: Handle,
-    output_sink: UnboundedSender<(Id, OwnedMessage)>,
-    event_sink: UnboundedSender<Event>,
+    output_sink: WrappedSender,
     rng: rand::ThreadRng,
     problems: Vec<Problem>,
 }
@@ -48,14 +50,12 @@ macro_rules! require_game_state {
 impl Runner {
     pub fn new(
         handle: Handle,
-        output_sink: UnboundedSender<(Id, OwnedMessage)>,
-        event_sink: UnboundedSender<Event>
+        output_sink: WrappedSender,
     ) -> Self {
         Self {
             data: GameData::new(),
             handle: handle,
             output_sink: output_sink,
-            event_sink: event_sink,
             rng: rand::thread_rng(),
             problems: vec![],
         }
@@ -65,15 +65,26 @@ impl Runner {
         self.problems = parse_file("problems/problem.toml");
     }
 
-    pub fn proc_event(&mut self, event: Event) {
+    pub fn proc_event(&mut self, event: WsEvent) {
         match event {
-            Event::UserSend(id, user_send) => self.proc_user_event(id, user_send),
-            Event::Connect(user) => self.user_connect(user),
-            Event::Disconnect(user) => self.user_disconnect(user),
-            Event::Timeout(func) => {
-                func.call_box((self, ));
+            WsEvent::Message(id, user_send) => {
+                let us = serde_json::from_str(&user_send).unwrap();
+                self.proc_user_event(id, us)
             }
+            WsEvent::Connect(user) => self.user_connect(user),
+            WsEvent::Disconnect(user) => self.user_disconnect(user),
+            _ => (),
+            //WsEvent::Timeout(func) => {
+                //func.call_box((self, ));
+            //}
         }
+    }
+
+    pub fn get_future(mut self, event_stream: UnboundedReceiver<WsEvent>) -> impl Future<Item=(), Error=()> {
+        event_stream.for_each(move |e| {
+            self.proc_event(e);
+            Ok(())
+        })
     }
 
     #[allow(unused_variables)]
@@ -308,16 +319,16 @@ impl Runner {
 
     fn exec_timeout<F>(&self, f: Box<F>, duration: Duration)
         where for<'r> F: FnBox(&'r mut Runner) -> () + Send + 'static {
-        let future = Timeout::new(duration, &self.handle).unwrap()
-            .and_then({
-                let event_sink = self.event_sink.clone();
-                let handle = self.handle.clone();
-                move |_| {
-                    handle.spawn(consume_result!(event_sink.send(Event::Timeout(f))));
-                    Ok(())
-                }
-            }).map_err(|_| ());
-        self.handle.spawn(future);
+        //let future = Timeout::new(duration, &self.handle).unwrap()
+            //.and_then({
+                //let event_stream = self.event_stream.clone();
+                //let handle = self.handle.clone();
+                //move |_| {
+                    //handle.spawn(consume_result!(event_stream.send(Event::Timeout(f))));
+                    //Ok(())
+                //}
+            //}).map_err(|_| ());
+        //self.handle.spawn(future);
     }
 
     fn _get_distant_to_line(o: Point, angle: f64, x: Point) -> (f64, f64) {
@@ -398,9 +409,7 @@ impl Runner {
     }
 
     fn _send(&self, id: Id, msg: String) {
-        self.handle.spawn(consume_result!(
-            self.output_sink.clone().send((id, OwnedMessage::Text(msg)))
-        ));
+        self.output_sink.unbounded_send((id, msg)).unwrap();
     }
 
     fn send_all<'a, 'b, T>(&self, iter: T, msg: &'b Output)
@@ -408,5 +417,25 @@ impl Runner {
         for id in iter {
             self.send(*id, msg);
         }
+    }
+}
+
+use ws::WsServer;
+
+pub struct GameServer {
+}
+
+impl GameServer {
+    pub fn start(mut self) {
+        let mut core = Core::new().expect("Failed to create event loop");
+        let mut ws_server = WsServer::new();
+        let (stream, sink) = ws_server.take();
+        let ws_future = ws_server.get_future(&core);
+        let mut runner = Runner::new(core.handle(), sink);
+        runner.init();
+        let runner_future = runner.get_future(stream);
+
+        let all_future = ws_future.join(runner_future);
+        core.run(all_future);
     }
 }

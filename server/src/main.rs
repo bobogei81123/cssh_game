@@ -1,7 +1,6 @@
 #![feature(plugin, custom_attribute)]
 #![plugin(rocket_codegen)]
 #![feature(conservative_impl_trait, type_ascription, fnbox, vec_remove_item)]
-#![allow(non_upper_case_globals)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -15,8 +14,6 @@ extern crate slog;
 extern crate slog_term;
 extern crate slog_async;
 
-extern crate chrono;
-extern crate byteorder;
 extern crate rocket;
 extern crate websocket;
 extern crate futures;
@@ -58,7 +55,7 @@ fn pimg_file(path: PathBuf) -> Option<NamedFile> {
 }
 
 fn main() {
-
     thread::spawn(|| rocket::ignite().mount("/", routes![hello, static_file, pimg_file]).launch());
-    ws::start();
+    let server = game::GameServer {};
+    server.start();
 }

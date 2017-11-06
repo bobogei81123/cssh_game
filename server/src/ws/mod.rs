@@ -5,90 +5,61 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::thread;
 
-use chrono::Utc;
-use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
+extern crate chrono;
+use self::chrono::Utc;
+
+extern crate byteorder;
+use self::byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 
 use tokio_core::reactor::{Core, Handle, Remote};
-use websocket::async::Server;
-use futures::{Future, Stream, Sink};
-use futures::future::{self, Loop};
-use futures::sync::mpsc;
+use tokio_core::net::TcpStream;
+
+use futures::{Future, Stream, Sink, StartSend};
+use futures::future::{self, Loop, Either};
+use futures::stream::{SplitSink, SplitStream};
+use futures::sync::mpsc::{self, UnboundedSender, UnboundedReceiver};
+
 use futures_cpupool::CpuPool;
 
+use websocket::async::{Server, Client};
 use websocket::message::OwnedMessage;
 use websocket::server::InvalidConnection;
-use websocket::client::async::Client;
 
 use serde_json;
 
 use common::*;
-use game::{Runner, UserSend};
-use event::Event;
 
-
-struct Counter {
-    count: Id,
-}
-
-impl Counter {
-    fn new() -> Self {
-        Self { count: 0 }
-    }
-}
-
-impl Iterator for Counter {
-    type Item = Id;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.count != Self::Item::max_value() {
-            self.count += 1;
-            return Some(self.count);
-        } else {
-            return None;
-        }
-    }
-}
 
 type MyClient = SplitSink<Client<TcpStream>>;
 
-use futures::stream::{SplitSink, SplitStream};
-use tokio_core::net::TcpStream;
-use futures::sync::mpsc::{UnboundedSender, UnboundedReceiver};
+mod counter;
+use self::counter::Counter;
 
-struct SinkStream<T> {
-    sink: UnboundedSender<T>,
-    stream: Option<UnboundedReceiver<T>>,
-}
+mod sink_stream;
+use self::sink_stream::SinkStream;
 
-impl<T> SinkStream<T> {
-    fn new() -> Self {
-        let (sink, stream) = mpsc::unbounded();
-        Self {
-            sink: sink,
-            stream: Some(stream),
-        }
-    }
+pub mod wrapped_sender;
+use self::wrapped_sender::WrappedSender;
 
-    fn take_stream(&mut self) -> UnboundedReceiver<T> {
-        self.stream.take().unwrap()
-    }
-}
-
-struct MainServer {
-    core: Core,
+pub struct WsServer {
     id_counter: Rc<RefCell<Counter>>,
     connections: Arc<RwLock<HashMap<Id, MyClient>>>,
     init_channel: SinkStream<(Id, SplitStream<Client<TcpStream>>)>,
     send_channel: SinkStream<(Id, OwnedMessage)>,
-    event_channel: SinkStream<Event>,
+    event_channel: SinkStream<WsEvent>,
 }
 
-impl MainServer {
-    fn new() -> Self {
-        let core = Core::new().expect("Failed to create Tokio event loop");
+pub enum WsEvent {
+    Connect(Id),
+    Message(Id, String),
+    Ping(Id, i64),
+    Disconnect(Id),
+}
+
+impl WsServer {
+    pub fn new() -> Self {
 
         Self {
-            core: core,
             id_counter: Rc::new(RefCell::new(Counter::new())),
             connections: Arc::new(RwLock::new(HashMap::new())),
             init_channel: SinkStream::new(),
@@ -133,10 +104,9 @@ impl MainServer {
 
                     let connect_fun = capture!(
                         connections, id_counter, init_sink, handle =>
-                        move |(client, _)| {
+                        move |(client, _): (Client<TcpStream>, _)| {
                             info!(logger, "A client connected"; "ip" => addr.to_string());
                             let id = id_counter.borrow_mut().next().unwrap();
-                            let client: Client<TcpStream> = client;
                             let (sink, stream) = client.split();
                             
                             Self::spawn(&handle, init_sink.send((id, stream)));
@@ -148,9 +118,8 @@ impl MainServer {
 
                     let send_fun = capture!(
                         event_sink, handle =>
-
                         move |id| {
-                            Self::spawn(&handle, event_sink.send(Event::Connect(id)));
+                            Self::spawn(&handle, event_sink.send(WsEvent::Connect(id)));
                             Ok(())
                         }
                     );
@@ -181,26 +150,26 @@ impl MainServer {
             move || {
 
                 send_stream.and_then(capture!(connections =>
-                        move |(id, msg)| -> Box<Future<Item=Option<(MyClient, Id)>, Error=()> + Send> {
+                        move |(id, msg)| {
                     let mut conn = connections.write().unwrap();
                     let conn = conn.remove(&id);
 
                     match conn {
                         Some(sink) => {
-                            Box::new(sink.send(msg)
+                            Either::A(sink.send(msg)
                                 .map(move |sink| Some((sink, id)))
                                 .or_else(
                                     capture!(connections, event_sink, remote => move |_| {
                                         connections.write().unwrap().remove(&id);
                                         Self::spawn_remote(&remote,
-                                                           event_sink.send(Event::Disconnect(id)));
+                                                           event_sink.send(WsEvent::Disconnect(id)));
                                         Ok(None)
                                     })
                                 ))
                         }
                         None => {
                             warn!(logger, "Try to send to dead client {}", id);
-                            Box::new(future::ok(None))
+                            Either::B(future::ok(None))
                         }
                     }
                 })).for_each(capture!(connections => move |opt| {
@@ -232,13 +201,10 @@ impl MainServer {
                             let message_fun = move |msg| {
                                 match msg {
                                     OwnedMessage::Text(text) => {
-                                        let decode: Option<UserSend> = serde_json::from_str(&text).ok();
-                                        if let Some(user_msg) = decode {
-                                            Self::spawn_remote(&remote, 
-                                                               event_sink.clone().send(Event::UserSend(id, user_msg)));
-                                        } else {
-                                            warn!(logger, "Parse failed."; "id" => id, "msg" => text);
-                                        }
+                                        Self::spawn_remote(
+                                            &remote, 
+                                            event_sink.clone().send(WsEvent::Message(id, text))
+                                        );
                                     }
                                     OwnedMessage::Pong(vec) => {
                                         let mut vec = vec.as_slice();
@@ -248,18 +214,16 @@ impl MainServer {
                                         let now = Utc::now();
                                         let diff = 1000 * (now.timestamp() - sec)
                                             + ((now.timestamp_subsec_millis() as i64 - milli_sec as i64));
+
                                         Self::spawn_remote(
-                                            &remote,
-                                            send_sink.clone().send((
-                                                id,
-                                                OwnedMessage::Text(json!({ "ping": [diff] }).to_string())
-                                            ))
-                                        )
+                                            &remote, 
+                                            event_sink.clone().send(WsEvent::Ping(id, diff))
+                                        );
                                     }
                                     OwnedMessage::Close(_) => {
                                         connections.write().unwrap().remove(&id);
                                         Self::spawn_remote(&remote,
-                                                           event_sink.clone().send(Event::Disconnect(id)));
+                                                           event_sink.clone().send(WsEvent::Disconnect(id)));
                                     }
                                     _ => { println!("{:?}", msg); }
                                 }
@@ -300,42 +264,40 @@ impl MainServer {
         }))
     }
 
-    fn make_event_future(&mut self, mut runner: Runner) 
-        -> impl Future<Item=(), Error=()> {
-        self.event_channel.take_stream().for_each(move |event| {
-            runner.proc_event(event);
-            Ok(())
-        })
-    }
+    //fn make_event_future(&mut self, mut runner: Runner) 
+        //-> impl Future<Item=(), Error=()> {
+        //self.event_channel.take_stream().for_each(move |event| {
+            //runner.proc_event(event);
+            //Ok(())
+        //})
+    //}
  
 
-    fn start(mut self) {
-        info!(logger, "Starting server...");
-        let handle = self.core.handle();
-        let remote = self.core.remote();
+    pub fn get_future<'a>(&mut self, core: &Core) -> impl Future<Item=(), Error=()> + 'a {
+        let handle = core.handle();
+        let remote = core.remote();
         let pool = CpuPool::new_num_cpus();
 
-        let mut runner = Runner::new(
-            handle.clone(), 
-            self.send_channel.sink.clone(),
-            self.event_channel.sink.clone(),
-        );
+        //let mut runner = Runner::new(
+            //handle.clone(), 
+            //self.send_channel.sink.clone(),
+            //self.event_channel.sink.clone(),
+        //);
 
-        runner.init();
+        //runner.init();
 
-        let combined_handler = Future::join5(
+        Future::join4(
             self.make_connection_future(&handle),
             self.make_send_future(&pool, &remote),
             self.make_init_future(&pool, &remote),
             self.make_ping_future(&pool, &remote),
-            self.make_event_future(runner),
-        );
-        self.core.run(combined_handler).unwrap();
+            //self.make_event_future(runner),
+        ).map(|_| ()).map_err(|_| ())
     }
-}
 
-pub fn start() {
-    let server = MainServer::new();
-    server.start();
+    pub fn take(&mut self)
+        -> (UnboundedReceiver<WsEvent>, WrappedSender) {
+        (self.event_channel.take_stream(), WrappedSender(self.send_channel.sink.clone()))
+    }
 }
 
