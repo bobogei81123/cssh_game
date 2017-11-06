@@ -3,25 +3,22 @@
 #![feature(conservative_impl_trait, type_ascription, fnbox, vec_remove_item)]
 
 extern crate rand;
-
 extern crate itertools;
-
-#[macro_use]
-extern crate slog;
-extern crate slog_term;
-extern crate slog_async;
-
-extern crate rocket;
-extern crate websocket;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate tokio_core;
 extern crate tokio_timer;
 
 #[macro_use]
-extern crate serde_derive;
+extern crate slog;
+extern crate slog_async;
+extern crate slog_term;
+
+
 extern crate serde;
 #[macro_use]
+extern crate serde_derive;
+
 extern crate serde_json;
 
 extern crate toml;
@@ -32,14 +29,14 @@ use rocket::response::NamedFile;
 
 #[macro_use] mod macro_utils;
 mod common;
-use common::*;
-
 mod event;
 mod ws;
 mod game;
 
 mod logger;
 use logger::make_logger;
+
+extern crate rocket;
 
 #[get("/")]
 fn hello() -> Option<NamedFile> {
@@ -57,7 +54,11 @@ fn pimg_file(path: PathBuf) -> Option<NamedFile> {
 }
 
 fn main() {
-    thread::spawn(|| rocket::ignite().mount("/", routes![hello, static_file, pimg_file]).launch());
+    thread::spawn(|| {
+        rocket::ignite()
+            .mount("/", routes![hello, static_file, pimg_file])
+            .launch()
+    });
     let logger = make_logger();
     let server = game::GameServer::new(logger);
     server.start();

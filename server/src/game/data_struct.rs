@@ -30,10 +30,8 @@ pub struct Player {
     pub health: Health,
     pub alive: bool,
 
-    #[serde(skip_serializing)]
-    pub assigned_problem: Option<usize>,
-    #[serde(skip_serializing)]
-    pub state: UserState,
+    #[serde(skip_serializing)] pub assigned_problem: Option<usize>,
+    #[serde(skip_serializing)] pub state: UserState,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -43,6 +41,7 @@ pub struct Health {
 }
 
 impl Health {
+    #[allow(dead_code)]
     pub fn add(&mut self, v: f64) {
         self.value = f64::min(self.max, self.value + v);
     }

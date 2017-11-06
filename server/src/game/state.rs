@@ -17,6 +17,7 @@ pub enum GameState {
     Started,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum UserState {
     Waiting,
@@ -39,7 +40,7 @@ pub struct PlayersData<'a> {
 
 impl GameData {
     pub fn new() -> Self {
-        Self { 
+        Self {
             game_state: GameState::Preparing,
             users: HashMap::new(),
             teams: [vec![], vec![]],
@@ -64,11 +65,11 @@ impl GameData {
 
 
     //pub fn add_user(&mut self, user: User) {
-        //self.users.insert(user.id, user);
+    //self.users.insert(user.id, user);
     //}
 
     //pub fn remove_user(&mut self, id: Id) {
-        //self.users.remove(&id);
+    //self.users.remove(&id);
     //}
 
     pub fn damage(&mut self, id: Id, val: f64) -> f64 {

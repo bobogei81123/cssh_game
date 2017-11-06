@@ -29,19 +29,22 @@ pub fn parse_file(path: &str) -> Vec<Problem> {
 
     let mut rng = rand::thread_rng();
 
-    problems.problems.into_iter().map(|prob| {
-        let n = prob.answers.len();
-        let mut ord: Vec<_> = (0..n).collect();
-        rng.shuffle(ord.as_mut_slice());
-        let shuffled = ord.iter().map(|i| prob.answers[*i].clone()).collect();
-        let correct = ord.iter().position(|&x| x == 0).unwrap();
-        Problem {
-            question: prob.question,
-            answers: shuffled,
-            correct: correct,
-        }
-    }).collect()
-
+    problems
+        .problems
+        .into_iter()
+        .map(|prob| {
+            let n = prob.answers.len();
+            let mut ord: Vec<_> = (0..n).collect();
+            rng.shuffle(ord.as_mut_slice());
+            let shuffled = ord.iter().map(|i| prob.answers[*i].clone()).collect();
+            let correct = ord.iter().position(|&x| x == 0).unwrap();
+            Problem {
+                question: prob.question,
+                answers: shuffled,
+                correct: correct,
+            }
+        })
+        .collect()
 }
 
 #[derive(Serialize, Debug)]

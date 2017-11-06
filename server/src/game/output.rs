@@ -3,7 +3,7 @@ use super::data_struct::*;
 use super::state::*;
 use super::problem::ProblemOut;
 
-#[derive(Serialize)] 
+#[derive(Serialize)]
 pub enum Output<'a> {
     Initial(Initial),
     RoomData(RoomData<'a>),

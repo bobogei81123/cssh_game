@@ -1,4 +1,4 @@
-use futures::sync::mpsc::{self, UnboundedSender, UnboundedReceiver};
+use futures::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 pub(super) struct SinkStream<T> {
     pub sink: UnboundedSender<T>,
@@ -15,7 +15,8 @@ impl<T> SinkStream<T> {
     }
 
     pub fn take_stream(&mut self) -> UnboundedReceiver<T> {
-        self.stream.take().expect("Stream is already taken by other")
+        self.stream
+            .take()
+            .expect("Stream is already taken by other")
     }
 }
-
