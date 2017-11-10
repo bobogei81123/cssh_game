@@ -16,9 +16,9 @@ impl Iterator for Counter {
     fn next(&mut self) -> Option<Self::Item> {
         if self.count != Self::Item::max_value() {
             self.count += 1;
-            return Some(self.count);
+            Some(self.count)
         } else {
-            return None;
+            None
         }
     }
 }

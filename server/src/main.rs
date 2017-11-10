@@ -1,18 +1,18 @@
 #![feature(plugin, custom_attribute)]
 #![plugin(rocket_codegen)]
 #![feature(conservative_impl_trait, type_ascription, fnbox, vec_remove_item)]
+#![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
+#![allow(clone_on_ref_ptr)]
 
-extern crate rand;
-extern crate itertools;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate itertools;
+extern crate rand;
 extern crate tokio_core;
 extern crate tokio_timer;
 
 #[macro_use]
 extern crate slog;
-extern crate slog_async;
-extern crate slog_term;
 
 
 extern crate serde;
@@ -27,7 +27,8 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use rocket::response::NamedFile;
 
-#[macro_use] mod macro_utils;
+#[macro_use]
+mod macro_utils;
 mod common;
 mod event;
 mod ws;

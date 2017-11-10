@@ -156,12 +156,11 @@ impl Runner {
         {
             let user = ensure!(self.data.users.get_mut(&id));
             let teams = &mut self.data.teams;
-            let team;
-            if teams[0].len() <= teams[1].len() {
-                team = 0;
+            let team = if teams[0].len() <= teams[1].len() {
+                0
             } else {
-                team = 1;
-            }
+                1
+            };
             teams[team].push(id);
             user.team = team;
             user.name = name;
@@ -196,6 +195,7 @@ impl Runner {
 
         self.data.players = {
             let mut generate_point = || {
+                #[allow(cast_lossless)]
                 Point {
                     x: ((self.rng.next_u32() as f64) % (GAME_WIDTH - GAME_WIDTH_MARGIN)
                         + GAME_WIDTH_MARGIN / 2.) as f64,
@@ -265,6 +265,7 @@ impl Runner {
             &self.problems[pid]
         };
 
+        #[allow(let_and_return)]
         let output = Output::Problem(ProblemOut {
             question: prob.question.clone(),
             answers: {
@@ -310,7 +311,7 @@ impl Runner {
         for i in 0..2 {
             if self.data.teams[i]
                 .iter()
-                .all(|p| !self.data.players.get(&p).unwrap().alive)
+                .all(|p| !self.data.players[p].alive)
             {
                 self.team_win(1 - i);
                 return;
@@ -333,7 +334,7 @@ impl Runner {
         self.data = GameData::new();
     }
 
-    #[allow(dead_code, unused_variables)]
+    #[allow(dead_code, unused_variables, boxed_local)]
     fn exec_timeout<F>(&self, f: Box<F>, duration: Duration)
     where
         for<'r> F: FnBox(&'r mut Runner) -> () + Send + 'static,
@@ -366,7 +367,7 @@ impl Runner {
             (player.pos, player.team)
         };
 
-        let my_pos = self.data.players.get(&id).unwrap().pos;
+        let my_pos = self.data.players[&id].pos;
 
         let result = self.data
             .players
@@ -432,11 +433,9 @@ impl Runner {
     }
 
     fn send(&self, id: Id, msg: &Output) {
-        self._send(id, serde_json::to_string(&msg).unwrap());
-    }
-
-    fn _send(&self, id: Id, msg: String) {
-        self.output_sink.unbounded_send((id, msg)).unwrap();
+        self.output_sink
+            .unbounded_send((id, serde_json::to_string(&msg).unwrap()))
+            .unwrap();
     }
 
     fn send_all<'a, 'b, T>(&self, iter: T, msg: &'b Output)

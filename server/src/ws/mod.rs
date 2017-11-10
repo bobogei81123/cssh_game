@@ -1,6 +1,6 @@
-extern crate websocket;
-extern crate chrono;
 extern crate byteorder;
+extern crate chrono;
+extern crate websocket;
 
 mod counter;
 mod sink_stream;
@@ -83,8 +83,7 @@ impl WsServer {
         handle: &Handle,
     ) -> impl Future<Item = (), Error = ()> + 'a {
         let server =
-            Server::bind("0.0.0.0:3210", &handle).expect("Failed to create websocket server");
-
+            Server::bind("0.0.0.0:3210", handle).expect("Failed to create websocket server");
 
         server
             .incoming()
@@ -205,8 +204,7 @@ impl WsServer {
                 init_stream.for_each(move |(id, stream)| {
                     Self::spawn_remote(
                         &remote,
-                        pool.spawn_fn(
-                            capture!(event_sink, remote, connections => move || {
+                        pool.spawn_fn(capture!(event_sink, remote, connections => move || {
 
                             let message_fun = move |msg| {
                                 match msg {
@@ -216,7 +214,7 @@ impl WsServer {
                                             event_sink.clone().send(WsEvent::Message(id, text))
                                         );
                                     }
-                                    OwnedMessage::Pong(vec) => {
+                                    OwnedMessage::Pong(ref vec) => {
                                         let diff = get_diff(vec);
 
                                         Self::spawn_remote(
@@ -238,8 +236,7 @@ impl WsServer {
                             };
 
                             consume_result!(stream.for_each(message_fun))
-                        }),
-                        ),
+                        })),
                     );
                     Ok(())
                 })
@@ -319,14 +316,14 @@ impl WsServer {
     }
 }
 
-fn get_diff(vec: Vec<u8>) -> i64 {
-    let mut vec = vec.as_slice();
+fn get_diff(mut vec: &[u8]) -> i64 {
     let sec = vec.read_i64::<BigEndian>().unwrap();
     let milli_sec = vec.read_u32::<BigEndian>().unwrap();
 
     let now = Utc::now();
-    let diff = 1000 * (now.timestamp() - sec)
-        + ((now.timestamp_subsec_millis() as i64 - milli_sec as i64));
 
-    return diff;
+    #[allow(cast_lossless)]
+    {
+        1000 * (now.timestamp() - sec) + (now.timestamp_subsec_millis() as i64 - milli_sec as i64)
+    }
 }
