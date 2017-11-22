@@ -13,35 +13,33 @@ use std::time::Duration;
 use std::sync::{Arc, RwLock};
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::thread;
 
 use self::chrono::Utc;
 use self::byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use tokio_core::reactor::{Core, Handle, Remote};
+use tokio_core::reactor::{Core, Handle, Remote, Interval};
 use tokio_core::net::TcpStream;
 
-use futures::future::{self, Either, Loop};
+use futures::future::{self, Either};
 use futures::stream::{SplitSink, SplitStream};
+use futures::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use futures_cpupool::CpuPool;
 
 use self::websocket::async::{Client, Server};
-use self::websocket::message::OwnedMessage;
+pub use self::websocket::message::OwnedMessage;
 use self::websocket::server::InvalidConnection;
 
 use self::counter::Counter;
-use self::sink_stream::SinkStream;
-use self::wrapped_sender::WrappedSender;
 
-type MyClient = SplitSink<Client<TcpStream>>;
+type ClientSink = SplitSink<Client<TcpStream>>; 
+type ClientStream = SplitStream<Client<TcpStream>>; 
+type MyClient = ClientSink;
 
 pub struct WsServer {
     id_counter: Rc<RefCell<Counter>>,
     connections: Arc<RwLock<HashMap<Id, MyClient>>>,
-    init_channel: SinkStream<(Id, SplitStream<Client<TcpStream>>)>,
-    send_channel: SinkStream<(Id, OwnedMessage)>,
-    event_channel: SinkStream<WsEvent>,
+    pool: CpuPool,
     logger: Logger,
 }
 
@@ -57,9 +55,7 @@ impl WsServer {
         Self {
             id_counter: Rc::new(RefCell::new(Counter::new())),
             connections: Arc::new(RwLock::new(HashMap::new())),
-            init_channel: SinkStream::new(),
-            send_channel: SinkStream::new(),
-            event_channel: SinkStream::new(),
+            pool: CpuPool::new_num_cpus(),
             logger: logger,
         }
     }
@@ -78,21 +74,54 @@ impl WsServer {
         remote.spawn(|_| future.map(|_| ()).map_err(|_| ()));
     }
 
-    fn make_connection_future<'a>(
-        &self,
-        handle: &Handle,
-    ) -> impl Future<Item = (), Error = ()> + 'a {
-        let server =
-            Server::bind("0.0.0.0:3210", handle).expect("Failed to create websocket server");
+    fn make_receive_future(
+        id: Id,
+        stream: ClientStream,
+        pool: CpuPool,
+        event_sink: UnboundedSender<WsEvent>,
+        connections: Arc<RwLock<HashMap<Id, MyClient>>>,
+    ) -> impl Future<Item = (), Error = ()> {
 
-        server
+        pool.spawn(
+            consume_result!(stream.for_each(move |msg| {
+                match msg {
+                    OwnedMessage::Text(text) => {
+                        event_sink.unbounded_send(WsEvent::Message(id, text));
+                    }
+                    OwnedMessage::Pong(ref vec) => {
+                        let diff = get_diff(vec);
+                        event_sink.unbounded_send(WsEvent::Ping(id, diff));
+                    }
+                    OwnedMessage::Close(_) => {
+                        connections.write().unwrap().remove(&id);
+                        event_sink.unbounded_send(WsEvent::Disconnect(id));
+                    }
+                    _ => { }
+                }
+                Ok(())
+            }))
+        )
+    }
+
+    #[allow(needless_pass_by_value)]
+    fn spawn_connection_future<'a>(
+        &self,
+        core: &Core,
+        //init_sink: UnboundedSender<(Id, ClientStream)>,
+        event_sink: UnboundedSender<WsEvent>,
+    ) {
+
+        let handle = core.handle();
+        let pool = self.pool.clone();
+        let server = Server::bind("0.0.0.0:3210", &handle)
+            .expect("Failed to create websocket server");
+
+        handle.spawn(server
             .incoming()
             .map_err(|InvalidConnection { error, .. }| error)
             .for_each({
                 let connections = self.connections.clone();
                 let id_counter = self.id_counter.clone();
-                let init_sink = self.init_channel.sink.clone();
-                let event_sink = self.event_channel.sink.clone();
                 let logger = self.logger.clone();
                 let handle = handle.clone();
 
@@ -104,215 +133,131 @@ impl WsServer {
                         return Ok(());
                     }
 
-                    let connect_fun = capture!(
-                        connections, id_counter, init_sink, handle, logger =>
-                        move |(client, _): (Client<TcpStream>, _)| {
-                            info!(logger, "A client connected"; "ip" => addr.to_string());
-                            let id = id_counter.borrow_mut().next().unwrap();
-                            let (sink, stream) = client.split();
-
-                            Self::spawn(&handle, init_sink.send((id, stream)));
-                            connections.write().unwrap().insert(id, sink);
-
-                            Ok(id)
-                        }
-                    );
-
-                    let send_fun = capture!(
-                        event_sink, handle =>
-                        move |id| {
-                            Self::spawn(&handle, event_sink.send(WsEvent::Connect(id)));
-                            Ok(())
-                        }
-                    );
-
                     let combined_future = upgrade
                         .use_protocol("rust-websocket")
                         .accept()
-                        .and_then(connect_fun)
-                        .and_then(send_fun);
+                        .and_then(capture!(
+                            connections, id_counter, handle, logger, pool, event_sink =>
+                            move |(client, _): (Client<TcpStream>, _)| {
+                                info!(logger, "A client connected"; "ip" => addr.to_string());
+                                let id = id_counter.borrow_mut().next().unwrap();
+                                let (sink, stream) = client.split();
+
+                                connections.write().unwrap().insert(id, sink);
+                                handle.spawn(
+                                    Self::make_receive_future(
+                                        id, stream, pool.clone(), event_sink.clone(), connections.clone())
+                                );
+                                event_sink.unbounded_send(WsEvent::Connect(id));
+                                Ok(())
+                            }
+                        ));
                     Self::spawn(&handle, combined_future);
 
                     Ok(())
                 }
             })
             .map_err(|_| ())
+        );
     }
 
-    fn make_send_future(
+    fn spawn_send_future(
         &mut self,
-        pool: &CpuPool,
-        remote: &Remote,
-    ) -> impl Future<Item = (), Error = ()> {
-        pool.spawn_fn({
-            let send_stream = self.send_channel.take_stream();
-            let event_sink = self.event_channel.sink.clone();
-            let connections = self.connections.clone();
-            let logger = self.logger.clone();
-            let remote = remote.clone();
+        core: &Core,
+        send_stream: UnboundedReceiver<(Id, OwnedMessage)>,
+        event_sink: UnboundedSender<WsEvent>,
+    ) {
 
-            move || {
+        let remote = core.remote();
+        let connections = self.connections.clone();
+        let logger = self.logger.clone();
+
+        core.handle().spawn(
+            self.pool.spawn(
                 send_stream
-                    .and_then(capture!(connections =>
-                        move |(id, msg)| {
-                    let mut conn = connections.write().unwrap();
-                    let conn = conn.remove(&id);
+                    .and_then(capture!(connections => move |(id, msg)| {
+                        let conn = connections.write().unwrap().remove(&id);
 
-                    match conn {
-                        Some(sink) => {
-                            Either::A(sink.send(msg)
-                                .map(move |sink| Some((sink, id)))
-                                .or_else(
-                                    capture!(connections, event_sink, remote => move |_| {
-                                        connections.write().unwrap().remove(&id);
-                                        Self::spawn_remote(
-                                            &remote,
-                                            event_sink.send(WsEvent::Disconnect(id)));
-                                        Ok(None)
-                                    })
-                                ))
+                        match conn {
+                            Some(sink) => {
+                                Either::A(sink.send(msg)
+                                    .map(move |sink| Some((sink, id)))
+                                    .or_else(
+                                        capture!(connections, event_sink, remote => move |_| {
+                                            connections.write().unwrap().remove(&id);
+                                            Self::spawn_remote(
+                                                &remote,
+                                                event_sink.send(WsEvent::Disconnect(id)));
+                                            Ok(None)
+                                        })
+                                    ))
+                            }
+                            None => {
+                                warn!(logger, "Try to send to dead client {}", id);
+                                Either::B(future::ok(None))
+                            }
                         }
-                        None => {
-                            warn!(logger, "Try to send to dead client {}", id);
-                            Either::B(future::ok(None))
-                        }
-                    }
-                }))
+                    }))
                     .for_each(capture!(connections => move |opt| {
-                    if let Some((sink, id)) = opt {
-                        connections.write().unwrap().insert(id, sink);
-                    }
-                    Ok(())
-                }))
-            }
-        })
+                        if let Some((sink, id)) = opt {
+                            connections.write().unwrap().insert(id, sink);
+                        }
+                        Ok(())
+                    }))
+            )
+        );
     }
 
-    fn make_init_future(
+    fn spawn_ping_future(
         &mut self,
-        pool: &CpuPool,
-        remote: &Remote,
-    ) -> impl Future<Item = (), Error = ()> {
-        pool.spawn_fn({
-            let init_stream = self.init_channel.take_stream();
-            let remote = remote.clone();
-            let event_sink = self.event_channel.sink.clone();
-            let connections = self.connections.clone();
-            let pool = pool.clone();
-
-            move || {
-                init_stream.for_each(move |(id, stream)| {
-                    Self::spawn_remote(
-                        &remote,
-                        pool.spawn_fn(capture!(event_sink, remote, connections => move || {
-
-                            let message_fun = move |msg| {
-                                match msg {
-                                    OwnedMessage::Text(text) => {
-                                        Self::spawn_remote(
-                                            &remote,
-                                            event_sink.clone().send(WsEvent::Message(id, text))
-                                        );
-                                    }
-                                    OwnedMessage::Pong(ref vec) => {
-                                        let diff = get_diff(vec);
-
-                                        Self::spawn_remote(
-                                            &remote,
-                                            event_sink.clone().send(WsEvent::Ping(id, diff))
-                                        );
-                                    }
-                                    OwnedMessage::Close(_) => {
-                                        connections.write().unwrap().remove(&id);
-                                        Self::spawn_remote(
-                                            &remote,
-                                            event_sink
-                                                .clone()
-                                                .send(WsEvent::Disconnect(id)));
-                                    }
-                                    _ => { println!("{:?}", msg); }
-                                }
-                                Ok(())
-                            };
-
-                            consume_result!(stream.for_each(message_fun))
-                        })),
-                    );
-                    Ok(())
-                })
-            }
-        })
-    }
-
-    fn make_ping_future(
-        &mut self,
-        pool: &CpuPool,
-        remote: &Remote,
-    ) -> impl Future<Item = (), Error = ()> {
-        pool.spawn(future::loop_fn((), {
-            let remote = remote.clone();
-            let connections = self.connections.clone();
-            let send_sink = self.send_channel.sink.clone();
-
-            move |()| {
-                {
-                    let connections = connections.write().unwrap();
-                    for (id, _) in connections.iter() {
-                        let current_time = Utc::now();
-                        let mut vec = vec![];
-                        vec.write_i64::<BigEndian>(current_time.timestamp())
-                            .unwrap();
-                        vec.write_u32::<BigEndian>(current_time.timestamp_subsec_millis())
-                            .unwrap();
-                        Self::spawn_remote(
-                            &remote,
-                            send_sink.clone().send((*id, OwnedMessage::Ping(vec))),
-                        );
-                    }
-                }
-                thread::sleep(Duration::from_secs(1));
-                Ok::<Loop<(), ()>, ()>(Loop::Continue(()))
-            }
-        }))
-    }
-
-    //fn make_event_future(&mut self, mut runner: Runner)
-    //-> impl Future<Item=(), Error=()> {
-    //self.event_channel.take_stream().for_each(move |event| {
-    //runner.proc_event(event);
-    //Ok(())
-    //})
-    //}
-
-
-    pub fn get_future<'a>(&mut self, core: &Core) -> impl Future<Item = (), Error = ()> + 'a {
+        core: &Core,
+        send_sink: UnboundedSender<(Id, OwnedMessage)>,
+    ) {
         let handle = core.handle();
         let remote = core.remote();
-        let pool = CpuPool::new_num_cpus();
 
-        //let mut runner = Runner::new(
-        //handle.clone(),
-        //self.send_channel.sink.clone(),
-        //self.event_channel.sink.clone(),
-        //);
+        core.handle().spawn(
+            self.pool.spawn(
+                consume_result!(
+                    Interval::new(Duration::from_secs(1), &handle).unwrap()
+                        .for_each({
+                        let connections = self.connections.clone();
 
-        //runner.init();
-
-        Future::join4(
-            self.make_connection_future(&handle),
-            self.make_send_future(&pool, &remote),
-            self.make_init_future(&pool, &remote),
-            self.make_ping_future(&pool, &remote),
-            //self.make_event_future(runner),
-        ).map(|_| ())
-            .map_err(|_| ())
+                        move |()| {
+                            let connections = connections.write().unwrap();
+                            for (id, _) in connections.iter() {
+                                let current_time = Utc::now();
+                                let mut vec = vec![];
+                                vec.write_i64::<BigEndian>(current_time.timestamp())
+                                    .unwrap();
+                                vec.write_u32::<BigEndian>(current_time.timestamp_subsec_millis())
+                                    .unwrap();
+                                Self::spawn_remote(
+                                    &remote,
+                                    send_sink.clone().send((*id, OwnedMessage::Ping(vec))),
+                                    );
+                            }
+                            Ok(())
+                        }
+                    })
+                )
+            )
+        );
     }
 
-    pub fn take(&mut self) -> (UnboundedReceiver<WsEvent>, WrappedSender) {
-        (
-            self.event_channel.take_stream(),
-            WrappedSender(self.send_channel.sink.clone()),
-        )
+    pub fn spawn_futures<'a>(
+        &mut self,
+        core: &Core,
+    ) -> (UnboundedSender<(Id, OwnedMessage)>, UnboundedReceiver<WsEvent>) {
+
+        let (event_sink, event_stream) = mpsc::unbounded::<WsEvent>();
+        let (send_sink, send_stream) = mpsc::unbounded::<(Id, OwnedMessage)>();
+
+        self.spawn_connection_future(core, event_sink.clone());
+        self.spawn_send_future(core, send_stream, event_sink.clone());
+        self.spawn_ping_future(core, send_sink.clone());
+
+        (send_sink, event_stream)
     }
 }
 

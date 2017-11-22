@@ -12,6 +12,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 use std::boxed::FnBox;
 use std::mem;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use rand::{self, Rng};
 
@@ -20,8 +22,11 @@ use serde_json;
 #[allow(unused_imports)]
 use tokio_core::reactor::Timeout;
 
+use futures::sync::mpsc::{unbounded, UnboundedSender, UnboundedReceiver};
+
 use ws::wrapped_sender::WrappedSender;
 use ws::WsEvent;
+use ws::OwnedMessage;
 
 #[allow(unused_imports)]
 use event::Event;
@@ -37,7 +42,7 @@ use self::problem::{parse_file, Problem, ProblemOut};
 pub struct Runner {
     data: GameData,
     #[allow(dead_code)] handle: Handle,
-    output_sink: WrappedSender,
+    output_sink: UnboundedSender<(Id, OwnedMessage)>,
     rng: rand::ThreadRng,
     problems: Vec<Problem>,
     logger: Logger,
@@ -50,7 +55,7 @@ macro_rules! require_game_state {
 }
 
 impl Runner {
-    pub fn new(handle: Handle, output_sink: WrappedSender, logger: Logger) -> Self {
+    pub fn new(handle: Handle, output_sink: UnboundedSender<(Id, OwnedMessage)>, logger: Logger) -> Self {
         Self {
             data: GameData::new(),
             handle: handle,
@@ -434,7 +439,7 @@ impl Runner {
 
     fn send(&self, id: Id, msg: &Output) {
         self.output_sink
-            .unbounded_send((id, serde_json::to_string(&msg).unwrap()))
+            .unbounded_send((id, OwnedMessage::Text(serde_json::to_string(&msg).unwrap())))
             .unwrap();
     }
 
@@ -451,25 +456,35 @@ impl Runner {
 use ws::WsServer;
 use slog::Logger;
 
+trait GameEventSink {
+    fn proc_message(&mut self, id: Id);
+}
+
+type RcGameEventSink = Rc<RefCell<Box<GameEventSink>>>;
+
 pub struct GameServer {
     logger: Logger,
+    //sink_map: HashMap<Id, RcGameEventSink>,
+    //sink_change_sink: UnboundedReceiver<(Id, RcGameEventSink)>,
 }
 
 impl GameServer {
     pub fn new(logger: Logger) -> Self {
-        Self { logger: logger }
+        Self { 
+            logger: logger,
+            //sink_map: HashMap::new()
+        }
     }
 
     pub fn start(self) {
         let mut core = Core::new().expect("Failed to create event loop");
         let mut ws_server = WsServer::new(self.logger.new(o!("who" => "WS")));
-        let (stream, sink) = ws_server.take();
-        let ws_future = ws_server.get_future(&core);
+        let (sink, stream) = ws_server.spawn_futures(&core);
         let mut runner = Runner::new(core.handle(), sink, self.logger.new(o!("who" => "Runner")));
         runner.init();
         let runner_future = runner.get_future(stream);
 
-        let all_future = ws_future.join(runner_future);
+        let all_future = runner_future;
         core.run(all_future).unwrap();
     }
 }
