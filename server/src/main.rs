@@ -1,10 +1,13 @@
 #![feature(plugin, custom_attribute)]
 #![plugin(rocket_codegen)]
-#![feature(conservative_impl_trait, type_ascription, fnbox, vec_remove_item)]
+#![feature(conservative_impl_trait)]
+#![feature(fnbox)]
+#![feature(catch_expr)]
+#![feature(box_syntax)]
 #![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
 #![allow(clone_on_ref_ptr)]
 
-extern crate futures;
+pub extern crate futures;
 extern crate futures_cpupool;
 extern crate itertools;
 extern crate rand;
@@ -60,7 +63,6 @@ fn main() {
             .mount("/", routes![hello, static_file, pimg_file])
             .launch()
     });
-    let logger = make_logger();
-    let server = game::GameServer::new(logger);
+    let server = game::GameServer::new();
     server.start();
 }

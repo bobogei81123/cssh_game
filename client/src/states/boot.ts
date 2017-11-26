@@ -79,12 +79,17 @@ export class Boot extends Phaser.State {
         this.main.ee.on('ping', (data) => {
             this.main.objects.ping_info_text.text = `Ping: ${data}\nFPS: ${this.game.time.fps}`;
         });
-        this.main.send('RequestInitial');
+
+        const name = await this.enterName();
+
+        this.main.send({
+            RequestInitial: name
+        });
 
         const initial = await this.main.waitForEvent('Initial');
         this.main.data.id = initial.id;
 
-        const name = await this.enterName();
+        this.main.send('Join');
         this.game.state.start('room', false, false, name);
     }
 }

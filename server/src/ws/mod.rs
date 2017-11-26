@@ -107,7 +107,6 @@ impl WsServer {
     fn spawn_connection_future<'a>(
         &self,
         core: &Core,
-        //init_sink: UnboundedSender<(Id, ClientStream)>,
         event_sink: UnboundedSender<WsEvent>,
     ) {
 

@@ -10,5 +10,5 @@ pub fn make_logger() -> Logger {
     //let drain = slog_envlogger::new(drain);
     let drain = slog_async::Async::new(drain).build().fuse();
 
-    Logger::root(drain.fuse(), o!())
+    Logger::root(drain.fuse(), o!("who" => "Main"))
 }

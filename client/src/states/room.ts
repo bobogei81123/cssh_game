@@ -13,8 +13,11 @@ export class Room extends Phaser.State {
     }
 
     init(name: string) {
+        this.main.send('Entered');
+
         this.data_shower = new RoomDataShower(this.game);
         this.button = new PrepareButton(this.game, 400, 520);
+
         this.button.onInputUp.addOnce(() => {
             this.main.send('Ready');
         });
@@ -27,9 +30,9 @@ export class Room extends Phaser.State {
         this.main.ee.on('RoomData', this.func);
 
         (async () => {
-            this.main.send({
-                'Join': name,
-            });
+            //this.main.send({
+                //'Join': name,
+            //});
             await this.main.waitForEvent('GameStart');
             this.game.state.start('start', false);
         })();
