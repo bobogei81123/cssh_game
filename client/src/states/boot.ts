@@ -9,29 +9,36 @@ export class Boot extends Phaser.State {
 
     preload() {
         this.load.baseURL = 'assets/';
-        this.load.image('background_far', 'background/farback.gif');
-        this.load.image('background_near', 'background/starfield.png');
+        //this.load.image('background_far', 'background/farback.gif');
+        this.load.image('background_far', 'background/starfield2.jpg');
+        //this.load.image('background_near', 'background/starfield.png');
+        this.load.image('room', 'objects/room.png');
 
-        this.load.spritesheet('explosion', 'explosion.png', 64, 64);
+        this.load.spritesheet('explosion', 'effects/explosion.png', 64, 64);
 
-        this.load.image('ship-ally', 'kenny/playerShip1_blue.png');
-        this.load.image('ship-enemy', 'kenny/playerShip2_red.png');
+        //this.load.image('ship-ally', 'kenny/playerShip1_blue.png');
+        //this.load.image('ship-enemy', 'kenny/playerShip2_red.png');
 
-        this.load.image('bullet10', 'bullet10.png');
+        //this.load.image('bullet10', 'bullet10.png');
         this.load.image('check', 'check.png');
         this.load.image('cross', 'cross.png');
-        this.load.image('button', 'button.png');
-        this.load.image('button-dark', 'button-dark.png');
+        this.load.image('ready-button', 'objects/ready-button.png');
+        this.load.image('waiting-button', 'objects/waiting-button.png');
+        //this.load.image('button-dark', 'button-dark.png');
 
         this.load.image('win', 'misc/win.png');
         this.load.image('lose', 'misc/lose.png');
         this.load.image('dead', 'misc/dead.png');
+        
+        this.load.atlasXML('space',
+            'spaceshooter/Spritesheet/sheet.png',
+            'spaceshooter/Spritesheet/sheet.xml',)
 
         this.load.atlasXML('ui',
             'uipack-space/Spritesheet/uipackSpace_sheet.png',
             'uipack-space/Spritesheet/uipackSpace_sheet.xml',)
 
-        this.load.image('vs', 'misc/vs.png');
+        //this.load.image('vs', 'misc/vs.png');
     }
 
     create() {
@@ -44,8 +51,8 @@ export class Boot extends Phaser.State {
     makeView() {
         let backgroundFar = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_far');
         backgroundFar.autoScroll(-3, 0);
-        let backgroundNear = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_near');
-        backgroundNear.autoScroll(-15, 0);
+        //let backgroundNear = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_near');
+        //backgroundNear.autoScroll(-15, 0);
 
         this.game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
         this.game.scale.refresh();
@@ -87,7 +94,7 @@ export class Boot extends Phaser.State {
         });
 
         const initial = await this.main.waitForEvent('Initial');
-        this.main.data.id = initial.id;
+        this.main.data.id = initial;
 
         this.main.send('Join');
         this.game.state.start('room', false, false, name);

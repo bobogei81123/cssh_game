@@ -3,8 +3,6 @@ extern crate chrono;
 extern crate websocket;
 
 mod counter;
-mod sink_stream;
-pub mod wrapped_sender;
 
 use common::*;
 
@@ -80,21 +78,23 @@ impl WsServer {
         pool: CpuPool,
         event_sink: UnboundedSender<WsEvent>,
         connections: Arc<RwLock<HashMap<Id, MyClient>>>,
+        logger: Logger,
     ) -> impl Future<Item = (), Error = ()> {
 
         pool.spawn(
             consume_result!(stream.for_each(move |msg| {
                 match msg {
                     OwnedMessage::Text(text) => {
-                        event_sink.unbounded_send(WsEvent::Message(id, text));
+                        info!(logger, "receive"; "id" => id, "msg" => text.clone());
+                        event_sink.unbounded_send(WsEvent::Message(id, text)).unwrap();
                     }
                     OwnedMessage::Pong(ref vec) => {
                         let diff = get_diff(vec);
-                        event_sink.unbounded_send(WsEvent::Ping(id, diff));
+                        event_sink.unbounded_send(WsEvent::Ping(id, diff)).unwrap();
                     }
                     OwnedMessage::Close(_) => {
                         connections.write().unwrap().remove(&id);
-                        event_sink.unbounded_send(WsEvent::Disconnect(id));
+                        event_sink.unbounded_send(WsEvent::Disconnect(id)).unwrap();
                     }
                     _ => { }
                 }
@@ -103,8 +103,7 @@ impl WsServer {
         )
     }
 
-    #[allow(needless_pass_by_value)]
-    fn spawn_connection_future<'a>(
+    fn spawn_connection_future(
         &self,
         core: &Core,
         event_sink: UnboundedSender<WsEvent>,
@@ -145,9 +144,9 @@ impl WsServer {
                                 connections.write().unwrap().insert(id, sink);
                                 handle.spawn(
                                     Self::make_receive_future(
-                                        id, stream, pool.clone(), event_sink.clone(), connections.clone())
+                                        id, stream, pool.clone(), event_sink.clone(), connections.clone(), logger.clone())
                                 );
-                                event_sink.unbounded_send(WsEvent::Connect(id));
+                                event_sink.unbounded_send(WsEvent::Connect(id)).unwrap();
                                 Ok(())
                             }
                         ));
@@ -176,6 +175,10 @@ impl WsServer {
                 send_stream
                     .and_then(capture!(connections => move |(id, msg)| {
                         let conn = connections.write().unwrap().remove(&id);
+
+                        if let OwnedMessage::Text(ref msg) = msg {
+                            info!(logger, "send"; "id" => id, "msg" => msg.clone());
+                        }
 
                         match conn {
                             Some(sink) => {
@@ -244,7 +247,7 @@ impl WsServer {
         );
     }
 
-    pub fn spawn_futures<'a>(
+    pub fn spawn_futures(
         &mut self,
         core: &Core,
     ) -> (UnboundedSender<(Id, OwnedMessage)>, UnboundedReceiver<WsEvent>) {

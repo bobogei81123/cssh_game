@@ -4,6 +4,7 @@
 #![feature(fnbox)]
 #![feature(catch_expr)]
 #![feature(box_syntax)]
+#![feature(vec_remove_item)]
 #![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
 #![allow(clone_on_ref_ptr)]
 
@@ -14,15 +15,9 @@ extern crate rand;
 extern crate tokio_core;
 extern crate tokio_timer;
 
-#[macro_use]
-extern crate slog;
+#[macro_use] extern crate serde_derive;
 
-
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-
-extern crate serde_json;
+#[macro_use] extern crate slog;
 
 extern crate toml;
 
@@ -30,15 +25,11 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use rocket::response::NamedFile;
 
-#[macro_use]
-mod macro_utils;
+#[macro_use] mod macro_utils;
 mod common;
-mod event;
 mod ws;
 mod game;
-
 mod logger;
-use logger::make_logger;
 
 extern crate rocket;
 

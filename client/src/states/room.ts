@@ -3,6 +3,20 @@ import * as Phaser from 'phaser-ce';
 import RoomDataShower from '../objects/room_data_shower';
 import PrepareButton from '../objects/prepare_button';
 
+export interface Player {
+    id: number;
+    name: string;
+    team: number;
+    ready: boolean;
+}
+
+export interface RoomData {
+    players: {
+        [_: number]: Player;
+    };
+    teams: [number[], number[]];
+}
+
 export class Room extends Phaser.State {
     data_shower: RoomDataShower;
     button: PrepareButton;
@@ -24,15 +38,21 @@ export class Room extends Phaser.State {
         this.game.world.addChild(this.data_shower);
         this.game.world.addChild(this.button);
 
-        this.func = (data) => {
-            this.data_shower.updateWithData(data);
+        this.func = (data: RoomData) => {
+            const id = this.main.data.id;
+            if (!(id in data.players)) {
+                return;
+            }
+
+            if (data.players[id].team == 1) {
+                [data.teams[0], data.teams[1]] = 
+                    [data.teams[1], data.teams[0]]
+            }
+            this.data_shower.updateWithData(data as any);
         }
         this.main.ee.on('RoomData', this.func);
 
         (async () => {
-            //this.main.send({
-                //'Join': name,
-            //});
             await this.main.waitForEvent('GameStart');
             this.game.state.start('start', false);
         })();

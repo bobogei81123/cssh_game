@@ -53,6 +53,7 @@ export class Start extends Phaser.State {
     }
 
     async initialize() {
+        /*
         this.main.send('RequestPlayersData');
         const data = await this.main.waitForEvent('PlayersData');
         if (_.includes(data.teams[0], this.main.data.id)) {
@@ -65,9 +66,11 @@ export class Start extends Phaser.State {
         setTimeout(() => {
             this.substate = Substate.Ready;
         }, 2000);
+         */
     }
 
     registEvents() {
+        /*
         this.main.ee.on('Fire', (data) => {
             const {fire, damage} = data;
             let bullet;
@@ -108,6 +111,7 @@ export class Start extends Phaser.State {
                 this.hideProblem();
             }
         });
+         */
     }
 
     setProblemHTML(question, answers) {
@@ -186,6 +190,7 @@ export class Start extends Phaser.State {
     }
 
     update() {
+        /*
         switch (this.substate) {
             case Substate.Ready: {
                 this.substate = Substate.Resolving;
@@ -226,6 +231,7 @@ export class Start extends Phaser.State {
             case Substate.End:
                 break;
         }
+         */
     }
 
     shutdown() {

@@ -1,97 +1,107 @@
 use common::*;
 
-use std::collections::HashMap;
+use std::mem;
 
-use super::common_trait::*;
+use super::common::*;
 use super::lobby::User;
+use super::game_runner::Game;
 
 #[derive(Serialize)]
 pub struct Player {
-    id: Id,
-    name: String,
-    team: usize,
+    pub id: Id,
+    pub name: String,
+    pub team: usize,
     ready: bool,
 }
 
-impl From<User> for Player {
-    fn from(User(id, name): User) -> Self {
+impl Player {
+    fn new(User(id, name): User, team: usize) -> Self {
         Self {
             id: id,
             name: name,
             ready: false,
-            team: 0,
+            team: team,
         }
     }
 }
 
 pub struct Room {
-    output_sink: WsSender,
-    logger: Logger,
+    common: Common,
+    sink_map: Rc<RefCell<SinkMap>>,
     players: HashMap<Id, Player>,
     teams: [Vec<Id>; 2],
 }
 
-impl Loggable for Room {
-    fn get_logger(&self) -> &Logger { &self.logger }
-}
+impl_loggable!(Room);
 
 #[derive(Serialize)]
 pub struct RoomData<'a> {
-    users: &'a HashMap<Id, Player>,
+    players: &'a HashMap<Id, Player>,
     teams: &'a [Vec<Id>; 2],
 }
 
 #[derive(Serialize)]
 pub enum Output<'a> {
     RoomData(RoomData<'a>),
+    GameStart,
 }
 
-impl<'a> OutputSender for &'a Room {
-    type Output = Output<'a>;
-
-    fn get_send_sink(&self) -> &WsSender {
-        &self.output_sink
-    }
-}
+impl_output_sender_lifetime!(Room, Output<'a>);
 
 #[derive(Deserialize)]
 pub enum Message {
     Entered,
+    Ready,
 }
 
-impl Service for Room {
+impl MessageSink for Room {
     type Message = Message;
 
     fn proc_message(&mut self, id: Id, msg: Message) {
         match msg {
             Message::Entered => {
-                self.send_players_data(id);
+                self.send(id, &self.room_data());
+            }
+            Message::Ready => {
+                self.user_ready(id);
             }
         }
     }
-
-    fn user_disconnect(&mut self, _id: Id) {}
 }
 
 impl RawService for Room {}
 
+impl UserEventListener for Room {
+    fn user_disconnect(&mut self, id: Id) {
+        do catch {
+            let player = self.players.remove(&id)?;
+            let team = player.team;
+            self.teams[team].remove_item(&id).unwrap();
+            self.broadcast_data();
+            Some(())
+        };
+    }
+}
+
+
 impl Room {
-    fn send_players_data(&self, id: Id) {
-        self.send(
-            id,
-            &Output::RoomData(RoomData {
-                users: &self.players,
-                teams: &self.teams,
-            })
-        )
+    fn room_data(&self) -> Output {
+        Output::RoomData(RoomData {
+            players: &self.players,
+            teams: &self.teams,
+        })
+    }
+
+    fn broadcast_data(&self) {
+        self.send_many(self.players.keys(), &self.room_data());
     }
 }
 
 impl Room {
-    pub fn new(output_sink: WsSender, logger: Logger) -> Self {
+    pub fn new(common: Common, sink_map: Rc<RefCell<SinkMap>>) -> Self {
         Self {
-            output_sink: output_sink,
-            logger: logger,
+            common: common,
+            sink_map: sink_map,
             players: HashMap::new(),
             teams: [vec![], vec![]],
         }
@@ -99,9 +109,46 @@ impl Room {
 
     pub fn user_entering(&mut self, user: User) {
         let id = user.0;
-        info!(self.logger, "User enter room"; "id" => user.0, "name" => &user.1);
-        self.players.insert(id, user.into());
-        self.teams[0].push(id);
+        info!(self.logger(), "User enter room"; "id" => user.0, "name" => &user.1);
+        let team = if self.teams[0].len() <= self.teams[1].len() { 0 } else { 1 };
+        self.players.insert(id, Player::new(user, team));
+        self.teams[team].push(id);
+        self.broadcast_data();
+    }
+
+    fn user_ready(&mut self, id: Id) {
+        do catch {
+            {
+                let player = self.players.get_mut(&id)?;
+                player.ready = true;
+            }
+            self.broadcast_data();
+
+            if self.players.values().all(|x| x.ready) {
+                self.spawn_game();
+            }
+            Some(())
+        };
+    }
+
+    fn spawn_game(&mut self) {
+        self.send_many(self.players.keys(), &Output::GameStart);
+
+        let players = mem::replace(&mut self.players, HashMap::new());
+
+        let ids = players.keys().map(|x| *x).collect::<Vec<_>>();
+
+        let game = Rc::new(RefCell::new(Game::new(Common {
+            logger: self.logger().new(o!("who" => "Game")),
+                ..self.common.clone()
+            }, self.sink_map.clone(), players.into_iter().map(|(_id, p)| p)
+        )));
+
+        let mut sink_map = self.sink_map.borrow_mut();
+        for id in ids {
+            sink_map.insert(id, game.clone());
+        }
+
+
     }
 }
-

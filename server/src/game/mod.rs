@@ -1,35 +1,26 @@
-mod common_trait;
+#[macro_use] mod macro_utils;
+
+mod common;
 mod lobby;
 mod room;
-//mod point;
-//mod data_struct;
-//mod user_send;
-//mod state;
-//mod output;
-//mod constant;
-//mod problem;
+mod game_runner;
+mod point;
+pub mod utils;
+pub mod constant;
 
-use common::*;
-
-
-
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json;
+use self::common::*;
 
 #[allow(unused_imports)]
 use tokio_core::reactor::Timeout;
 
 use ws::WsEvent;
-use ws::OwnedMessage;
 
-#[allow(unused_imports)]
-use event::Event;
+//#[allow(unused_imports)]
+//use event::Event;
 
 use ws::WsServer;
 use logger;
 
-pub use self::common_trait::*;
 use self::lobby::Lobby;
 
 #[derive(Clone)]
@@ -67,12 +58,12 @@ impl GameServer {
 
         let handle = core.handle();
         let logger = self.logger.clone();
-        let mut lobby = //Rc::new(RefCell::new(
-                Lobby::new(
-                    send_sink.clone(),
-                    logger.new(o!("who" => "Lobby")),
-                );
-            //));
+        let mut lobby =
+            Lobby::new(
+                handle.clone(),
+                send_sink.clone(),
+                logger.new(o!("who" => "Lobby")),
+            );
 
         let server_sender = GameServerSender(send_sink);
 
@@ -80,11 +71,11 @@ impl GameServer {
             ws_event_stream
             .for_each(move |event| {
                 match event {
-                    WsEvent::Connect(id) => {
+                    WsEvent::Connect(_id) => {
                         //sink_map.borrow_mut().insert(id, lobby.clone());
                     },
                     WsEvent::Disconnect(id) => {
-                        //sink_map.borrow_mut().remove(&id);
+                        lobby.user_disconnect(id);
                     },
                     WsEvent::Message(id, msg) => {
                         lobby.proc_raw_message(id, msg);
