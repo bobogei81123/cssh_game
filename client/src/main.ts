@@ -54,6 +54,12 @@ export default class Main extends Phaser.Game {
         });
     }
 
+    disconnect() {
+        if (this.ws != null) {
+            this.ws.close();
+        }
+    }
+
 
     send(data) {
         this.ws.send(JSON.stringify(data));
@@ -78,8 +84,6 @@ export default class Main extends Phaser.Game {
         }
         const ks = Object.keys(parsed);
         if (!ks.length) return;
-
-        if (ks[0] != 'ping') console.log(parsed);
 
         const key = ks[0];
         const data = parsed[key];

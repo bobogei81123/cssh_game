@@ -1,5 +1,4 @@
 #![feature(plugin, custom_attribute)]
-#![plugin(rocket_codegen)]
 #![feature(conservative_impl_trait)]
 #![feature(fnbox)]
 #![feature(catch_expr)]
@@ -23,7 +22,7 @@ extern crate toml;
 
 use std::path::{Path, PathBuf};
 use std::thread;
-use rocket::response::NamedFile;
+use std::time::Duration;
 
 #[macro_use] mod macro_utils;
 mod common;
@@ -31,8 +30,11 @@ mod ws;
 mod game;
 mod logger;
 
-extern crate rocket;
+extern crate iron;
+extern crate mount;
+extern crate staticfile;
 
+/*
 #[get("/")]
 fn hello() -> Option<NamedFile> {
     static_file("index.html".into())
@@ -47,12 +49,19 @@ fn static_file(path: PathBuf) -> Option<NamedFile> {
 fn pimg_file(path: PathBuf) -> Option<NamedFile> {
     NamedFile::open(Path::new("../problems/images/").join(path)).ok()
 }
+*/
 
 fn main() {
     thread::spawn(|| {
-        rocket::ignite()
-            .mount("/", routes![hello, static_file, pimg_file])
-            .launch()
+        //rocket::ignite()
+            //.mount("/", routes![hello, static_file, pimg_file])
+            //.launch()
+        let mut mount = mount::Mount::new();
+        mount.mount("/", staticfile::Static::new(Path::new("../client/"))
+                    .cache(Duration::from_secs(60*60*24)));
+        mount.mount("/pimg/", staticfile::Static::new(Path::new("../problems/images/")));
+        println!("Iron running at 0.0.0.0:8000");
+        iron::Iron::new(mount).http("0.0.0.0:8000").unwrap();
     });
     let server = game::GameServer::new();
     server.start();

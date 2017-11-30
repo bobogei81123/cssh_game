@@ -15,7 +15,6 @@ use std::borrow::Borrow;
 
 pub use super::point::Point;
 pub use super::utils;
-pub use super::constant::*;
 
 pub trait Loggable {
     fn logger(&self) -> &Logger;

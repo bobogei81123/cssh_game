@@ -27,11 +27,11 @@ export class Boot extends Phaser.State {
         this.load.image('cross', 'cross.png');
         this.load.image('ready-button', 'objects/ready-button.png');
         this.load.image('waiting-button', 'objects/waiting-button.png');
-        //this.load.image('button-dark', 'button-dark.png');
 
         this.load.image('win', 'misc/win.png');
         this.load.image('lose', 'misc/lose.png');
-        this.load.image('dead', 'misc/dead.png');
+        //this.load.image('dead', 'misc/dead.png');
+        this.load.image('refresh', 'objects/refresh-button.png');
         
         this.load.atlasXML('space',
             'spaceshooter/Spritesheet/sheet.png',
@@ -51,7 +51,7 @@ export class Boot extends Phaser.State {
 
     makeView() {
         let backgroundFar = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_far');
-        backgroundFar.autoScroll(-3, 0);
+        backgroundFar.autoScroll(-3, -1);
         //let backgroundNear = this.game.add.tileSprite(0, 0, this.game.width, this.game.height, 'background_near');
         //backgroundNear.autoScroll(-15, 0);
 
@@ -64,6 +64,14 @@ export class Boot extends Phaser.State {
 
         this.main.objects.ping_info_text =
             this.game.add.text(760, 10, 'Ping: ', {fill: '#FFFFFF', fontSize: 10});
+
+        const refreshButton = this.game.add.button(20, 20, 'refresh');
+        refreshButton.anchor.set(0.5);
+        refreshButton.width = refreshButton.height = 30;
+        refreshButton.onInputUp.add(() => {
+            this.main.disconnect();
+            this.game.state.start('boot');
+        }, this);
     }
 
     async enterName(): Promise<any> {
@@ -84,7 +92,7 @@ export class Boot extends Phaser.State {
         this.main.data = new GameData(this.main);
         await this.main.connectWebsocket();
 
-        this.main.ee.on('ping', (data) => {
+        this.main.ee.on('Ping', (data) => {
             this.main.objects.ping_info_text.text = `Ping: ${data}\nFPS: ${this.game.time.fps}`;
         });
 

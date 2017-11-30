@@ -56,7 +56,10 @@ export default class GameData {
         }
     }
 
-    setHealth(id, val) {
-        this.players[id].health.set(val);
+    setHealth(id, val, dead=false) {
+        if (!(id in this.players)) return;
+        const player = this.players[id];
+        player.health.set(val);
+        if (dead) player.markDead();
     }
 }

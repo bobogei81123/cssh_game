@@ -135,13 +135,16 @@ impl Room {
         self.send_many(self.players.keys(), &Output::GameStart);
 
         let players = mem::replace(&mut self.players, HashMap::new());
+        let teams = mem::replace(&mut self.teams, [vec![], vec![]]);
 
         let ids = players.keys().cloned().collect::<Vec<_>>();
 
         let game = Game::new(Common {
             logger: self.logger().new(o!("who" => "Game")),
                 ..self.common.clone()
-            }, self.sink_map.clone(), players.into_iter().map(|(_id, p)| p)
+            }, self.sink_map.clone(),
+            players.into_iter().map(|(_id, p)| p),
+            teams,
         );
 
         let mut sink_map = self.sink_map.borrow_mut();

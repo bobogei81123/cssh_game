@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser-ce';
-import {USER} from '../constant';
+import {USER, FIRE} from '../constant';
 
 type Point = Phaser.Point;
 const Point = Phaser.Point;
@@ -7,7 +7,7 @@ const Point = Phaser.Point;
 export class Hit {
     constructor(
         public target_point: Point,
-        public onHit: () => void,
+        public onHit: () => void = () => {},
     ) {}
 }
 
@@ -31,7 +31,7 @@ export default class Bullet extends Phaser.Sprite {
         this.scale.set(1);
         this.rotation = angle + 0.5 * Math.PI;
         this.game.physics.arcade
-            .velocityFromAngle(angle * 180 / Math.PI, 400.0, this.body.velocity);
+            .velocityFromAngle(angle * 180 / Math.PI, FIRE.SPEED, this.body.velocity);
     }
 
     update() {

@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser-ce';
-import {USER} from '../constant';
+import {USER, FIRE} from '../constant';
 import {Player as PlayerData} from '../server_data/start';
 
 type Point = Phaser.Point;
@@ -89,8 +89,24 @@ class Spinner extends Phaser.Sprite {
     }
 }
 
+export class BodySprite extends Phaser.Sprite {
+    constructor(game: Phaser.Game, x: number, y: number, public is_enemy: boolean) {
+        super(game, 0, 0, 'space',
+            is_enemy ? 'playerShip2_red.png' : 'playerShip1_blue.png');
+        this.anchor.set(0.5);
+    }
+
+    markDead() {
+        const dead = new Phaser.Sprite(this.game, 0, 0, 'space',
+            this.is_enemy ? 'playerShip2_damage3.png' : 'playerShip1_damage3.png');
+        dead.anchor.set(0.5);
+        dead.tint = this.tint = 0x606060;
+        this.addChild(dead);
+    }
+}
+
 export default class User extends Phaser.Group {
-    private body_sprite: Phaser.Sprite;
+    private body_sprite: BodySprite;
     private spinner: Spinner;
     private timer?: Phaser.Timer;
     private loop_event?: Phaser.TimerEvent;
@@ -111,11 +127,10 @@ export default class User extends Phaser.Group {
 
         this.syncWith(data);
 
-        this.body_sprite = new Phaser.Sprite(
-            game, 0, 0, 'space', friend ? 'playerShip1_blue.png' : 'enemyRed2.png');
+        this.body_sprite = new BodySprite(
+            game, 0, 0, !friend);
         this.body_sprite.width = USER.RADIUS * 2;
         this.body_sprite.height = USER.RADIUS * 2;
-        this.body_sprite.anchor.set(0.5);
         this.addChild(this.body_sprite);
 
 
@@ -161,7 +176,7 @@ export default class User extends Phaser.Group {
         if (angle - this.body_sprite.rotation >= Math.PI) angle -= Math.PI*2;
 
         const tween = this.game.add.tween(this.body_sprite);
-        tween.to({rotation: angle}, 500, Phaser.Easing.Quadratic.InOut);
+        tween.to({rotation: angle}, FIRE.DELAY * 1000, Phaser.Easing.Quadratic.InOut);
         const promise = new Promise((resolve, reject) => {
             tween.onComplete.addOnce(() => {
                 resolve();
@@ -172,9 +187,6 @@ export default class User extends Phaser.Group {
     }
 
     markDead() {
-        const dead = new Phaser.Sprite(this.game, 0, 0, 'dead');
-        dead.anchor.set(0.5);
-        dead.scale.set(0.2);
-        this.addChild(dead);
+        this.body_sprite.markDead();
     }
 }

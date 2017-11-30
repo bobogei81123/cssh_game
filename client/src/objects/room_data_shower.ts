@@ -11,7 +11,7 @@ class UserItem extends Phaser.Group {
     ) {
         super(game);
         const plane = new Phaser.Sprite(game, 0, 12, 'space',
-            is_enemy ? 'enemyRed2.png' : 'playerShip1_blue.png');
+            is_enemy ? 'playerShip2_red.png' : 'playerShip1_blue.png');
         plane.width = 60;
         plane.height = 60;
         plane.anchor.set(0.5);
