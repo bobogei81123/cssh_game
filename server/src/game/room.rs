@@ -136,19 +136,17 @@ impl Room {
 
         let players = mem::replace(&mut self.players, HashMap::new());
 
-        let ids = players.keys().map(|x| *x).collect::<Vec<_>>();
+        let ids = players.keys().cloned().collect::<Vec<_>>();
 
-        let game = Rc::new(RefCell::new(Game::new(Common {
+        let game = Game::new(Common {
             logger: self.logger().new(o!("who" => "Game")),
                 ..self.common.clone()
             }, self.sink_map.clone(), players.into_iter().map(|(_id, p)| p)
-        )));
+        );
 
         let mut sink_map = self.sink_map.borrow_mut();
         for id in ids {
             sink_map.insert(id, game.clone());
         }
-
-
     }
 }

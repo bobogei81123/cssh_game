@@ -1,5 +1,7 @@
 import * as Phaser from 'phaser-ce';
 import {USER} from '../constant';
+import {Player as PlayerData} from '../server_data/start';
+
 type Point = Phaser.Point;
 const Point = Phaser.Point;
 
@@ -100,7 +102,7 @@ export default class User extends Phaser.Group {
     friend: boolean;
     health: Health;
 
-    constructor(game: Phaser.Game, data: any, friend: boolean) {
+    constructor(game: Phaser.Game, data: PlayerData, friend: boolean) {
         const {name, team, pos, health} = data;
         super(game, null)
         this.friend = friend;
@@ -109,7 +111,8 @@ export default class User extends Phaser.Group {
 
         this.syncWith(data);
 
-        this.body_sprite = new Phaser.Sprite(game, 0, 0, 'ship-' + (friend ? 'ally' : 'enemy'));
+        this.body_sprite = new Phaser.Sprite(
+            game, 0, 0, 'space', friend ? 'playerShip1_blue.png' : 'enemyRed2.png');
         this.body_sprite.width = USER.RADIUS * 2;
         this.body_sprite.height = USER.RADIUS * 2;
         this.body_sprite.anchor.set(0.5);
@@ -130,7 +133,7 @@ export default class User extends Phaser.Group {
         this.game.world.add(this);
     }
 
-    syncWith(data: any) {
+    syncWith(data: PlayerData) {
         const {name, team, pos, health} = data;
         if (name != null) this.name = name;
         if (team != null) this.team = team;
@@ -151,7 +154,7 @@ export default class User extends Phaser.Group {
         return [pos, angle]
     }
 
-    rotateAndFire(angle: number): Promise<any> {
+    rotateAndFire(angle: number): Promise<{}> {
         this.body_sprite.rotation = this.body_sprite.rotation % (Math.PI*2);
         angle = (angle + Math.PI/2) % (Math.PI * 2);
         while (angle < this.body_sprite.rotation) angle += Math.PI*2;

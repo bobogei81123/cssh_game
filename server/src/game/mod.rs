@@ -5,6 +5,7 @@ mod lobby;
 mod room;
 mod game_runner;
 mod point;
+mod problem;
 pub mod utils;
 pub mod constant;
 

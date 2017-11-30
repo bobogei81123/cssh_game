@@ -8,6 +8,9 @@ export class Boot extends Phaser.State {
     }
 
     preload() {
+        this.game.stage.disableVisibilityChange = true;
+        this.game.time.advancedTiming = true;
+
         this.load.baseURL = 'assets/';
         //this.load.image('background_far', 'background/farback.gif');
         this.load.image('background_far', 'background/starfield2.jpg');
@@ -43,8 +46,6 @@ export class Boot extends Phaser.State {
 
     create() {
         this.makeView();
-        this.game.stage.disableVisibilityChange = true;
-        this.game.time.advancedTiming = true;
         this.initialize();
     }
 

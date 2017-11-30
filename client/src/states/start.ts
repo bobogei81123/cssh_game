@@ -6,6 +6,7 @@ import {GAME} from '../constant';
 import User from '../objects/user';
 import * as marked from 'marked';
 import * as _ from 'lodash';
+import {PlayersData} from '../server_data/start.ts';
 
 const renderer = new marked.Renderer();
 renderer.image = function (href, title, alt) {
@@ -21,7 +22,6 @@ renderer.image = function (href, title, alt) {
     }
     return `<img src="${href}" alt="${alt}">`;
 }
-
 
 const Point = Phaser.Point;
 type Point = Phaser.Point;
@@ -53,6 +53,7 @@ export class Start extends Phaser.State {
     }
 
     async initialize() {
+        this.main.send('Entered');
         /*
         this.main.send('RequestPlayersData');
         const data = await this.main.waitForEvent('PlayersData');
@@ -70,8 +71,14 @@ export class Start extends Phaser.State {
     }
 
     registEvents() {
-        /*
-        this.main.ee.on('Fire', (data) => {
+        this.main.ee.on('PlayersData', (data: PlayersData) => this.main.data.syncWith(data));
+
+        this.main.ee.on('Problem', (data) => {
+            this.setProblemHTML(data);
+            this.showProblem();
+        });
+        
+        this.main.ee.on('FireResult', (data) => {
             const {fire, damage} = data;
             let bullet;
             if (damage == null) {
@@ -111,10 +118,17 @@ export class Start extends Phaser.State {
                 this.hideProblem();
             }
         });
-         */
+
+        this.main.ee.on('JudgeResult', (result) => {
+            this.showResult(result);
+        });
+
+        this.main.ee.on('StartFire', (result) => {
+            this.startFire();
+        });
     }
 
-    setProblemHTML(question, answers) {
+    setProblemHTML({question, answers}) {
         const $modal = document.getElementById('problem-modal');
         const $question = document.getElementById('question');
         const $answers = document.getElementById('answers');
@@ -136,7 +150,7 @@ export class Start extends Phaser.State {
 
             $article.appendChild($content);
             $article.onclick = (() => {
-                this.main.ee.emit('chooseAnswer', idx);
+                this.answer(idx);
             });
             $answers.appendChild($article);
         });
@@ -150,6 +164,13 @@ export class Start extends Phaser.State {
     hideProblem() {
         const $modal = document.getElementById('problem-modal');
         $modal.classList.remove('is-active');
+    }
+
+    answer(idx: number) {
+        this.hideProblem();
+        this.main.send({
+            Answer: idx,
+        });
     }
 
     showResult(flag) {

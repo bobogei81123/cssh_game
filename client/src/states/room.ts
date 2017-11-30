@@ -2,20 +2,7 @@ import Main from '../main';
 import * as Phaser from 'phaser-ce';
 import RoomDataShower from '../objects/room_data_shower';
 import PrepareButton from '../objects/prepare_button';
-
-export interface Player {
-    id: number;
-    name: string;
-    team: number;
-    ready: boolean;
-}
-
-export interface RoomData {
-    players: {
-        [_: number]: Player;
-    };
-    teams: [number[], number[]];
-}
+import {RoomData} from '../server_data/room';
 
 export class Room extends Phaser.State {
     data_shower: RoomDataShower;
@@ -27,6 +14,8 @@ export class Room extends Phaser.State {
     }
 
     init(name: string) {
+        console.log('@ room.init');
+        console.log(this.main.stage.disableVisibilityChange);
         this.main.send('Entered');
 
         this.data_shower = new RoomDataShower(this.game);

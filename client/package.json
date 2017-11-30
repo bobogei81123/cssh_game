@@ -8,13 +8,14 @@
     "@types/lodash": "^4.14.77",
     "@types/marked": "^0.3.0",
     "@types/websocket": "^0.0.34",
+    "async-csp": "^0.5.0",
     "bulma": "^0.6.0",
     "lodash": "^4.17.4",
     "marked": "^0.3.6",
     "phaser-ce": "^2.9.0",
     "reconnecting-websocket": "^3.2.2",
     "uglifyjs-webpack-plugin": "^1.0.0-beta.3",
-    "wolfy87-eventemitter": "^5.2.3"
+    "wolfy87-eventemitter": "5.2.4"
   },
   "devDependencies": {
     "@types/node": "^8.0.31",

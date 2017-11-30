@@ -3,7 +3,8 @@ import * as Phaser from 'phaser-ce';
 import User from './objects/user';
 import Bullet, {Hit} from './objects/bullet';
 import GameData from './game_data';
-import EventEmitter from 'wolfy87-eventemitter';
+//import * as EventEmitter from 'wolfy87-eventemitter';
+import EventEmitter = require('wolfy87-eventemitter');
 import * as State from './states';
 import {GAME} from './constant';
 
@@ -17,11 +18,17 @@ export default class Main extends Phaser.Game {
     ee: EventEmitter;
 
     constructor() {
-        super(GAME.WIDTH, GAME.HEIGHT, Phaser.WEBGL, 'content');
+        super({
+            width: GAME.WIDTH,
+            height: GAME.HEIGHT,
+            renderer: Phaser.AUTO,
+            parent: 'content',
+        });
 
         this.data = new GameData(this);
-        this.ee = new EventEmitter<string>();
+        this.ee = new EventEmitter();
         this.objects = {};
+
         this.state.add('boot', new State.Boot(this));
         this.state.add('room', new State.Room(this));
         this.state.add('start', new State.Start(this));

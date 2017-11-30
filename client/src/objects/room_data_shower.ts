@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser-ce';
 import {GAME} from '../constant';
-import {RoomData} from '../states/room';
+import {RoomData} from '../server_data/room';
 
 class UserItem extends Phaser.Group {
     constructor(
@@ -17,7 +17,7 @@ class UserItem extends Phaser.Group {
         plane.anchor.set(0.5);
         this.addChild(plane);
 
-        const text = new Phaser.Text(game, 0, 52, name, {fontSize: 10, fill: '#FFFFFF'});
+        const text = new Phaser.Text(game, 0, 54, name, {fontSize: 12, fill: '#FFFFFF'});
         text.anchor.set(0.5);
         this.addChild(text);
 
@@ -43,18 +43,14 @@ export default class RoomDataShower extends Phaser.Group {
     }
 
     updateWithData({players, teams}: RoomData) {
-        //for (let user of this.user_items) {
-            //user.destroy();
-        //}
-        //this.user_items = [];
-
+        this.removeBetween(1);
         for (let t of [0, 1]) {
             for (let [i, id] of teams[t].entries()) {
                 const x = (t == 0 ? 175 : 275) + 100 * i;
                 const {name, ready} = players[id];
                 const userItem = new UserItem(this.game, t == 1, name, ready);
                 userItem.position.set(x, t == 0 ? 150 : 350);
-               //this.addChild(userItem);
+               this.addChild(userItem);
             }
         }
     }

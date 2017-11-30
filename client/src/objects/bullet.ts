@@ -14,7 +14,7 @@ export class Hit {
 export default class Bullet extends Phaser.Sprite {
 
     constructor(game: Phaser.Game, public hit?: Hit) {
-        super(game, 0, 0, 'bullet10');
+        super(game, 0, 0, 'space', 'laserRed01.png');
         this.game.physics.arcade.enable(this);
         this.scale.set(0.8);
 
@@ -29,7 +29,7 @@ export default class Bullet extends Phaser.Sprite {
         this.game.world.add(this);
         this.reset(from.x, from.y);
         this.scale.set(1);
-        this.rotation = angle;
+        this.rotation = angle + 0.5 * Math.PI;
         this.game.physics.arcade
             .velocityFromAngle(angle * 180 / Math.PI, 400.0, this.body.velocity);
     }

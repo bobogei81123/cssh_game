@@ -14,10 +14,11 @@ struct _Problems {
     problems: Vec<_Problem>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Problem {
     pub question: String,
     pub answers: Vec<String>,
+    #[serde(skip_serializing)]
     pub correct: usize,
 }
 
@@ -45,10 +46,4 @@ pub fn parse_file(path: &str) -> Vec<Problem> {
             }
         })
         .collect()
-}
-
-#[derive(Serialize, Debug)]
-pub struct ProblemOut {
-    pub question: String,
-    pub answers: Vec<String>,
 }

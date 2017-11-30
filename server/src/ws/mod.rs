@@ -72,6 +72,7 @@ impl WsServer {
         remote.spawn(|_| future.map(|_| ()).map_err(|_| ()));
     }
 
+    #[allow(needless_pass_by_value)]
     fn make_receive_future(
         id: Id,
         stream: ClientStream,
@@ -85,7 +86,7 @@ impl WsServer {
             consume_result!(stream.for_each(move |msg| {
                 match msg {
                     OwnedMessage::Text(text) => {
-                        info!(logger, "receive"; "id" => id, "msg" => text.clone());
+                        debug!(logger, "receive"; "id" => id, "msg" => text.clone());
                         event_sink.unbounded_send(WsEvent::Message(id, text)).unwrap();
                     }
                     OwnedMessage::Pong(ref vec) => {
@@ -177,7 +178,7 @@ impl WsServer {
                         let conn = connections.write().unwrap().remove(&id);
 
                         if let OwnedMessage::Text(ref msg) = msg {
-                            info!(logger, "send"; "id" => id, "msg" => msg.clone());
+                            debug!(logger, "send"; "id" => id, "msg" => msg.clone());
                         }
 
                         match conn {

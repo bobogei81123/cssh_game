@@ -1,5 +1,6 @@
 import User from './objects/user';
 import * as _ from 'lodash';
+import {PlayersData, Player as PlayerData} from './server_data/start';
 
 export default class GameData {
     id: number;
@@ -14,8 +15,7 @@ export default class GameData {
         return this.players[this.id];
     }
 
-    addUser(data) {
-        console.log(data);
+    addUser(data: PlayerData) {
         const id = data.id;
         if (id in this.players) {
             this.removeUser(id);
@@ -23,36 +23,36 @@ export default class GameData {
         this.players[id] = new User(this.game, data, this.team == data.team); 
     }
 
-    removeUser(id) {
+    removeUser(id: number) {
         if (id in this.players) {
             this.players[id].destroy();
             delete this.players[id];
         }
     }
 
-    syncUser(id, data) {
+    syncUser(id: number, data: PlayerData) {
         if (!(id in this.players)) return;
 
         const user = this.players[id];
         user.syncWith(data);
     }
 
-    syncWith(data) {
-        console.log(this);
-        const shouldRemove = _.difference(_.keys(this.players), _.keys(data.players));
-        const shouldAdd = _.difference(_.keys(data.players), _.keys(this.players));
-        const shouldSync = _.intersection(_.keys(data.players), _.keys(this.players));
+    syncWith(players: PlayersData) {
+        this.team = players[this.id].team;
+        const shouldRemove = _.difference(_.keys(this.players), _.keys(players));
+        const shouldAdd = _.difference(_.keys(players), _.keys(this.players));
+        const shouldSync = _.intersection(_.keys(players), _.keys(this.players));
 
         for (let id of shouldRemove) {
-            this.removeUser(id);
+            this.removeUser(id as any);
         }
 
         for (let id of shouldAdd) {
-            this.addUser(data.players[id]);
+            this.addUser(players[id]);
         }
 
         for (let id of shouldSync) {
-            this.syncUser(id, data.players[id]);
+            this.syncUser(id as any, players[id]);
         }
     }
 

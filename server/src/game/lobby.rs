@@ -44,13 +44,13 @@ impl Lobby {
     ) -> Self {
         let sink_map = Rc::new(RefCell::new(HashMap::new()));
         let common = Common {
-                handle: handle.clone(),
-                ws_sender: output_sink.clone(),
-                logger: logger.clone(),
+                handle: handle,
+                ws_sender: output_sink,
+                logger: logger,
             };
         Self {
             common: common.clone(),
-            sink_map: sink_map.clone(),
+            sink_map: sink_map,
             users: HashMap::new(),
 
             _default_room: Weak::new(),
@@ -91,8 +91,8 @@ impl MessageSink for Lobby {
                 let user = self.users.get(&id);
                 if let Some(user) = user {
                     println!("{}", self._default_room.upgrade().map(|x| Rc::strong_count(&x)).unwrap_or(0));
-                    let room = self._default_room.upgrade().unwrap_or(
-                        Rc::new(RefCell::new(Room::new(
+                    let room = self._default_room.upgrade().unwrap_or_else(
+                        || Rc::new(RefCell::new(Room::new(
                                 Common {
                                     logger: self.logger().new(o!("who" => "Room")),
                                     ..self.common.clone()
